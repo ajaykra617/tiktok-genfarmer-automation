@@ -1,21 +1,27 @@
 {
   "project": "TikTok Automation / GenFarmer",
   "visibility": "public-source-private-client-config",
-  "phase": "single-device-foundation",
+  "phase": "genfarmer-api-discovery",
   "verified_capabilities": [
-    "single-device ADB control",
+    "20 Android devices visible to ADB",
+    "single-device safe Android smoke workflow passes",
+    "Settings launch and UI hierarchy inspection",
+    "local evidence capture",
     "GenFarmer API reachable",
     "GenFarmer fingerprint rotation",
     "XProxy service reachable",
     "first-position proxy listeners available"
   ],
+  "observations": [
+    "selected device reported Android release 10 with SDK 35; identity coherence needs review"
+  ],
   "blockers": [
     "first cellular modem/SIM does not yet expose a verified mobile public IP"
   ],
   "next": [
-    "clone on client PC",
-    "safe Android smoke automation",
-    "GenFarmer API endpoint discovery",
-    "GenFarmer API-driven smoke workflow"
+    "run read-only GenFarmer API discovery",
+    "document confirmed GenFarmer endpoints and schemas",
+    "review Android identity coherence",
+    "build GenFarmer API-driven smoke workflow"
   ]
 }

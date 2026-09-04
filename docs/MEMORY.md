@@ -17,7 +17,9 @@
 - Treat broad Vue Flow `type` values as rendering families. The first semantic pass proves the actual operation identity is `type + data.action`.
 - Exact raw flows remain local under ignored `evidence/`. Share only structural catalogs, safe internal action tokens, and masked differential reports.
 - The local Python template registry must load exact node templates only from the private raw corpus. It must never embed or publish raw client flows in Git.
-- Static `app.asar` scans are candidate discovery only. The first broad scan returned obvious generic-code false positives, so package-only tokens are never treated as verified nodes without a live GenFarmer-generated flow.
+- Static `app.asar` scans are not authoritative. V1 produced generic-code false positives; V2 found only three strict action-syntax matches, recovered none of the seven live actions, and produced no package-only candidates. Do not spend more time trying to enumerate the palette from raw package token scans unless a stronger extraction method becomes available.
+- Full node coverage must therefore come from live GenFarmer-generated nodes in a dedicated lab Automation App.
+- Before authoring edges, prove routing relationships from the private corpus: specifically whether `data.successNode`/`data.failNode` correspond to outgoing edge targets and which handle names are used.
 - Versioned semantic registries may contain only privacy-safe action names, field/type shapes, observed enum values and handle semantics.
 
 ## Verified milestones
@@ -31,14 +33,14 @@
 - A reusable documented-API client and read-only compatibility smoke script exist in the repository.
 - A lossless `script.flow` wrapper, round-trip gate, structural learner, semantic learner, private snapshot tool and privacy-safe diff tool exist.
 - First flow corpus: one app, seven nodes, three edges and four broad families (`custom`, `custom-context-menu`, `helper`, `input`).
-- Seven semantic actions are now live-observed: `Start`, `Variables`, `ContextMenu`, `Adb`, `DeepSeek`, `Pause`, `Screenshot`.
+- Seven semantic actions are live-observed: `Start`, `Variables`, `ContextMenu`, `Adb`, `DeepSeek`, `Pause`, `Screenshot`.
 - `Pause` has an observed `timeoutType` value of `fixed`.
 - Normal custom nodes use left target/right source positions in this corpus.
 - Observed edges use a generated Start source handle into `successNode`, then `successNode` -> `successNode` for normal success chaining.
 - A local-only `TemplateRegistry` indexes exact observed node templates by `type + data.action`.
 - A versioned privacy-safe GenFarmer 2.6.1 semantic registry records the seven observed actions.
-- The original broad package scanner produced false positives such as generic authentication/version/post-style tokens and is not authoritative.
-- A stricter PascalCase/runtime-marker package scanner has been added for the next discovery pass.
+- The strict V2 package scan is inconclusive for palette discovery: zero live actions recovered and zero package-only candidates.
+- A privacy-safe local routing analyzer now exists to aggregate pointer/edge/handle relationships without exposing node IDs or app logic.
 
 ## Script.flow learning strategy
 
@@ -46,9 +48,9 @@
 2. Preserve exact raw flows locally.
 3. Build shareable structural and semantic catalogs.
 4. Record only live-observed actions in the versioned semantic registry.
-5. Run the strict packaged scanner only to generate a targeted list of possible missing actions.
-6. Create `GF Lab - Node Catalog` only for visible palette nodes that still have no verified live template.
-7. Learn `data.action`, option-key shapes, defaults and edge handles from GenFarmer-generated nodes.
+5. Mine the private corpus for routing semantics before generating edges.
+6. Create `GF Lab - Node Catalog` and add every visible palette node once with harmless synthetic values where required.
+7. Re-run structural + semantic learners against that lab app.
 8. Load exact templates into the local-only template registry; do not fabricate undocumented node payloads.
 9. For ambiguous options, snapshot before, change exactly one UI field, snapshot after, and produce a masked shareable diff.
 10. Require exact Python round-trip equality before any flow PUT.
@@ -79,9 +81,9 @@ Several devices report Android release values that do not naturally match SDK 35
 
 ## Remaining work
 
-- Run the strict package scanner and compare it with the seven live actions.
-- Create/populate `GF Lab - Node Catalog` only for actions still lacking a real saved template.
-- Build the complete GenFarmer 2.6.1 node/action registry using differential learning.
+- Run the private-corpus routing analyzer and capture `successNode`/`failNode` pointer consistency.
+- Create/populate `GF Lab - Node Catalog` with every still-unobserved visible action.
+- Build the complete GenFarmer 2.6.1 node/action registry using live templates and differential learning.
 - Prove a harmless Python edit and generated flow through GenFarmer.
 - Resolve GenFarmer device ID mapping.
 - Resolve undocumented fingerprint and proxy integration surfaces only as needed.

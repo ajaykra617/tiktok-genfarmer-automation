@@ -11,31 +11,42 @@
     "official GenFarmer Local API documentation located",
     "reusable documented-API Python client implemented with fail-closed mutations",
     "lossless script.flow reader/editor and round-trip gate implemented",
-    "structural script.flow learner executed successfully",
-    "privacy-safe semantic learner and differential tooling implemented",
+    "structural and semantic script.flow learners executed successfully",
+    "seven live semantic actions identified",
     "local-only script.flow template registry implemented",
-    "read-only packaged palette/action scanner implemented",
+    "versioned GenFarmer 2.6.1 semantic action registry implemented",
+    "strict read-only packaged palette/action scanner implemented",
     "GenFarmer fingerprint rotation previously proven",
     "XProxy service reachable",
     "first-position proxy listeners available"
   ],
+  "verified_semantic_actions": [
+    "input:Start",
+    "helper:Variables",
+    "custom-context-menu:ContextMenu",
+    "custom:Adb",
+    "custom:DeepSeek",
+    "custom:Pause",
+    "custom:Screenshot"
+  ],
   "current_findings": [
-    "first flow corpus contains 1 app, 7 nodes, 3 edges and 4 broad Vue Flow families",
-    "4 nodes share type=custom so node.type is not the unique automation action identity",
-    "data.action is the primary semantic operation discriminator to verify",
-    "observed flow fields include success/failure routing, timeout/sleep/breakpoint/disabled options and handle metadata",
-    "verified node creation should clone exact local templates rather than fabricate undocumented payloads"
+    "node.type is a rendering family and data.action is the semantic operation discriminator",
+    "Pause timeoutType=fixed is observed",
+    "Start outbound edges use a generated source handle into target successNode",
+    "normal success-chain edges use successNode to successNode",
+    "the first broad app.asar action scan produced generic-code false positives and is not authoritative",
+    "verified node creation must clone exact local templates rather than fabricate undocumented payloads"
   ],
   "blockers": [
     "full GenFarmer node palette has not yet been cataloged",
     "first cellular modem/SIM does not yet expose a verified mobile public IP"
   ],
   "next": [
-    "run privacy-safe semantic catalog to capture real data.action operations",
-    "run read-only app.asar palette/action scan and compare with live flow actions",
-    "create GF Lab - Node Catalog only for still-unobserved palette actions",
+    "run strict app.asar palette/action scan v2",
+    "compare package-only candidates with seven live semantic actions",
+    "create GF Lab - Node Catalog only for still-unobserved visible actions",
     "learn ambiguous options with one-field-at-a-time private snapshots and masked diffs",
-    "populate the local template registry with verified GenFarmer 2.6.1 nodes",
+    "populate local template registry with verified GenFarmer 2.6.1 nodes",
     "prove a harmless Python-authored flow on Device #1"
   ]
 }

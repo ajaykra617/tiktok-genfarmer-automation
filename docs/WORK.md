@@ -19,20 +19,23 @@ Learn the GenFarmer 2.6.1 `script.flow` language exhaustively enough to create a
 - [x] Add lossless `script.flow` reader/editor and round-trip tests.
 - [x] Run first read-only `script.flow` corpus pass.
 - [x] First corpus: 1 app, 7 nodes, 3 edges, 4 broad Vue Flow families.
-- [x] Identify that `type=custom` is a rendering family, not a unique automation action.
-- [x] Identify `data.action` as a key semantic discriminator to catalog next.
+- [x] Prove `type=custom` is a rendering family rather than a unique automation action.
+- [x] Run semantic learner and identify seven real semantic actions: `Start`, `Variables`, `ContextMenu`, `Adb`, `DeepSeek`, `Pause`, `Screenshot`.
+- [x] Record `Pause.timeoutType=fixed` as an observed enum value.
+- [x] Record two observed edge-handle patterns: generated Start handle -> `successNode`, and `successNode` -> `successNode`.
 - [x] Add privacy-safe semantic catalog tooling.
 - [x] Add private before/after flow snapshots and shareable masked differential tooling.
 - [x] Add local-only node template registry keyed by `type + data.action` and structural variant.
-- [x] Add read-only `app.asar` palette/action scanner to discover likely automation actions not present in current apps.
+- [x] Add read-only `app.asar` palette/action scanner.
+- [x] Classify the first broad static palette scan as noisy/insufficient for action discovery.
+- [x] Add a stricter package scanner that only considers PascalCase `action:` tokens and scores GenFarmer runtime markers.
+- [x] Add a versioned GenFarmer 2.6.1 semantic action registry for the seven observed actions.
 
 ## In progress
 
-- [ ] Run `scripts/genfarmer_flow_semantics.py` against the existing app corpus.
-- [ ] Run `scripts/genfarmer_palette_scan.py` against GenFarmer 2.6.1 packaged resources.
-- [ ] Compare live `data.action` values with packaged palette/action candidates.
-- [ ] Capture the distinct operations hidden under `type=custom`.
-- [ ] Create `GF Lab - Node Catalog` in the GenFarmer UI only for nodes still missing after static/live discovery.
+- [ ] Run `scripts/genfarmer_palette_scan_v2.py` against GenFarmer 2.6.1.
+- [ ] Compare strict package-only candidates with the seven verified live actions.
+- [ ] Create `GF Lab - Node Catalog` only for actions still lacking a live saved template.
 - [ ] Add every still-unobserved visible node-palette item once using harmless synthetic configuration.
 - [ ] Run structural + semantic learners against the Node Catalog app.
 - [ ] Populate the local template registry from the private exact-flow corpus.
@@ -41,22 +44,35 @@ Learn the GenFarmer 2.6.1 `script.flow` language exhaustively enough to create a
 - [ ] Perform one harmless Python-generated edit and verify GenFarmer UI reloads it correctly.
 - [ ] Generate a harmless flow from verified templates and execute it on Device #1.
 
-## Specific semantics to learn
+## Currently verified semantic actions
 
-- [ ] start/end/helper/context nodes;
+| Semantic kind | Family | Key observed options/behavior |
+|---|---|---|
+| `input:Start` | `input` | graph entry; generated Start handle routes into target `successNode` |
+| `helper:Variables` | `helper` | empty options object in first corpus |
+| `custom-context-menu:ContextMenu` | `custom-context-menu` | `casePaths` object observed |
+| `custom:Adb` | `custom` | command/outputVariable plus common runtime controls |
+| `custom:DeepSeek` | `custom` | common runtime controls observed |
+| `custom:Pause` | `custom` | timeout/fixed-range fields; `timeoutType=fixed` observed |
+| `custom:Screenshot` | `custom` | common runtime controls observed |
+
+These are structurally verified, not fully behaviorally modeled. Unknown options remain template-clone-only until differential tests prove their semantics.
+
+## Specific semantics still to learn
+
 - [ ] app launch/stop/actions;
 - [ ] tap/click selector modes;
 - [ ] text/resource-id/XPathLite/class/coordinates selectors;
-- [ ] wait/sleep/timeout modes;
+- [ ] random/range wait semantics;
 - [ ] swipe/scroll/gesture nodes;
 - [ ] input/type/paste nodes;
-- [ ] variables/input/output/storage nodes;
-- [ ] conditions/branches/case paths;
+- [ ] variables/input/output/storage details;
+- [ ] conditions/branches/case-path handle semantics;
 - [ ] loops/retry/failure paths;
 - [ ] module/context/function nodes;
-- [ ] screenshot/image/vision nodes if present;
+- [ ] screenshot output/storage behavior;
+- [ ] image/vision nodes if present;
 - [ ] network/device/system nodes if present;
-- [ ] edge handle semantics and success/failure routing;
 - [ ] defaults, required fields, optional fields and enum values for every action.
 
 ## Official-doc gaps to resolve later

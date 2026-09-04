@@ -16,6 +16,8 @@
 - Learn `script.flow` from GenFarmer-generated graphs before Python authors them. Clone verified templates and patch only fields whose semantics are proven.
 - Treat broad Vue Flow node `type` values as rendering families. The first corpus proves that multiple different actions can share `type=custom`; semantic identification must include `data.action` and verified option fields.
 - Exact raw flows remain local under ignored `evidence/`. Share only structural catalogs, safe internal action tokens, and masked differential reports.
+- The local Python template registry must load exact node templates only from the private raw corpus. It must never embed or publish raw client flows in Git.
+- Static inspection of `resources/app.asar` may be used read-only to discover likely action tokens missing from the current live app corpus. The scanner must emit token/marker/schema metadata only, never proprietary source snippets.
 
 ## Verified milestones
 
@@ -30,18 +32,22 @@
 - First flow corpus: one app, seven nodes, three edges, four broad families (`custom`, `custom-context-menu`, `helper`, `input`).
 - Four observed nodes use `type=custom`, confirming that `node.type` alone is not the automation operation identity.
 - First observed graph fields include success/failure routing, node sleep/timeouts, breakpoint/disabled flags, timeout modes/ranges, command/output-variable fields and source/target handle metadata.
+- A local-only `TemplateRegistry` now indexes exact observed node templates by `type + data.action` and deduplicates structural variants.
+- A read-only packaged palette scanner now searches `app.asar` for high-confidence automation `action` tokens and nearby schema markers without extracting or modifying packaged files.
 
 ## Script.flow learning strategy
 
 1. Read existing apps GET-only.
 2. Preserve exact raw flows locally.
 3. Build shareable structural and semantic catalogs.
-4. Create a dedicated `GF Lab - Node Catalog` app containing every visible palette node once.
-5. Learn `data.action` values, option-key shapes, default values and edge handles.
-6. For ambiguous options, take a private before snapshot, change one UI field, take an after snapshot, and produce a masked shareable diff.
-7. Require exact Python round-trip equality before any flow PUT.
-8. Add semantic Python helpers only after the relevant node action is proven on GenFarmer 2.6.1.
-9. Run harmless generated/edit flows on Device #1 before using any authorized application workflow.
+4. Run the packaged palette scanner and compare static action candidates with live `data.action` values.
+5. Create a dedicated `GF Lab - Node Catalog` app only to cover palette nodes that still have no verified live template.
+6. Learn `data.action` values, option-key shapes, default values and edge handles.
+7. Load verified exact templates into the local-only template registry; do not fabricate nodes from undocumented schemas.
+8. For ambiguous options, take a private before snapshot, change one UI field, take an after snapshot, and produce a masked shareable diff.
+9. Require exact Python round-trip equality before any flow PUT.
+10. Add semantic Python helpers only after the relevant node action is proven on GenFarmer 2.6.1.
+11. Run harmless generated/edit flows on Device #1 before using any authorized application workflow.
 
 ## Official API coverage
 
@@ -55,8 +61,9 @@ Several devices report Android release values that do not naturally match SDK 35
 
 ## Remaining work
 
-- Run the new semantic catalog against the current flow corpus and capture real `data.action` names.
-- Create and populate `GF Lab - Node Catalog` with every visible palette node.
+- Run the semantic catalog against the current flow corpus and capture real `data.action` names.
+- Run the packaged palette scanner and compare its action candidates against live flows.
+- Create/populate `GF Lab - Node Catalog` only for actions still lacking a real saved template.
 - Build the complete GenFarmer 2.6.1 node/action registry using differential learning.
 - Prove a harmless Python edit and generated flow through GenFarmer.
 - Resolve GenFarmer device ID mapping.

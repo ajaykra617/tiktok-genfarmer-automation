@@ -4,6 +4,11 @@ version = "0.1.0"
 description = "Authorized Android automation using GenFarmer and XProxy"
 requires-python = ">=3.11"
 
+[project.optional-dependencies]
+dev = [
+  "pytest>=8.4,<9",
+]
+
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 pythonpath = ["src"]

@@ -1,7 +1,7 @@
 {
   "project": "TikTok Automation / GenFarmer",
   "visibility": "public-source-private-client-config",
-  "phase": "genfarmer-script-flow-learning",
+  "phase": "script-flow-language-learning",
   "verified_capabilities": [
     "20 Android devices visible simultaneously to ADB",
     "safe Device #1 Settings smoke workflow passed with local evidence",
@@ -10,30 +10,29 @@
     "GenFarmer listener identified as GenFarmer.exe 2.6.1.0",
     "official GenFarmer Local API documentation located",
     "reusable documented-API Python client implemented with fail-closed mutations",
-    "official API confirms Automation App script.flow contains nodes and edges",
-    "lossless Python script.flow model implemented",
-    "GET-only flow corpus learner and shareable structural catalog implemented",
-    "GET-only exact flow round-trip verifier implemented",
+    "lossless script.flow reader/editor and round-trip gate implemented",
+    "structural script.flow learner executed successfully",
+    "privacy-safe semantic learner and differential tooling implemented",
     "GenFarmer fingerprint rotation previously proven",
     "XProxy service reachable",
     "first-position proxy listeners available"
   ],
   "current_findings": [
-    "official docs cover current user plus Automation Apps, Tasks and Runs",
-    "official docs expose script.flow but do not enumerate complete per-node JSON schemas",
-    "full node support must be learned version-specifically from observed GenFarmer-generated flows",
-    "official docs do not clearly expose generic device inventory, fingerprint/profile, proxy update, create-app, or reliable GET task-list APIs",
-    "some Android identity properties are inconsistent with SDK 35 and require profile-vs-system comparison"
+    "first flow corpus contains 1 app, 7 nodes, 3 edges and 4 broad Vue Flow families",
+    "4 nodes share type=custom so node.type is not the unique automation action identity",
+    "data.action must be cataloged as the semantic operation discriminator",
+    "observed flow fields include success/failure routing, timeout/sleep/breakpoint/disabled options and handle metadata"
   ],
   "blockers": [
+    "full GenFarmer node palette has not yet been cataloged",
     "first cellular modem/SIM does not yet expose a verified mobile public IP"
   ],
   "next": [
-    "run official documented GET-only API smoke against GenFarmer 2.6.1",
-    "run GET-only script.flow learner across accessible Automation Apps",
-    "analyze flow-catalog.shareable.json and identify missing visible palette nodes",
-    "create a harmless GF Lab - Node Catalog app if palette coverage is incomplete",
-    "prove exact Python round-trip for a harmless app",
-    "build verified semantic node adapters and execute one harmless generated flow"
+    "run privacy-safe semantic catalog to capture real data.action operations",
+    "create GF Lab - Node Catalog and add every visible palette node once",
+    "run structural and semantic learners against the Node Catalog app",
+    "learn ambiguous options with one-field-at-a-time private snapshots and masked diffs",
+    "build versioned Python node template registry for GenFarmer 2.6.1",
+    "prove a harmless Python-authored flow on Device #1"
   ]
 }

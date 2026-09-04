@@ -12,6 +12,9 @@
 - The official GenFarmer API documentation is the primary contract for supported Local API calls.
 - Packaged-app route discovery is retained only as a fallback for gaps not covered by official documentation.
 - All GenFarmer POST/PUT/DELETE methods in our Python client are fail-closed by default and require explicit mutation opt-in.
+- Use a hybrid architecture: GenFarmer Automation Apps/no-code flows execute device actions, while Python orchestrates devices, inputs, runs, retries, evidence, XProxy checks, and higher-level workflow state.
+- The public API documents updating an Automation App's `script.flow`, but does not document a POST endpoint for creating a new Automation App. Safest bootstrap is to create one harmless app in the GenFarmer UI, read its app details, then learn/generate compatible flow JSON from Python.
+- Direct Python ADB/Appium-style automation remains possible, but it bypasses GenFarmer's native Automation App/Task/Run engine and is not the preferred primary execution path for this project.
 
 ## Verified milestones
 
@@ -35,11 +38,12 @@ Documented read operations include:
 
 Documented mutation operations include:
 
-- create/update/delete apps/tasks/runs where applicable;
-- assign/remove devices on tasks;
-- execute an Automation Run.
+- update/delete Automation Apps;
+- create/update/delete Tasks;
+- assign/remove devices on Tasks;
+- create and execute Runs.
 
-The public API page does not clearly document a generic device inventory API, direct fingerprint/change-device API, proxy update API, or a reliable GET task-list endpoint. These remain controlled discovery items.
+The public API page does not clearly document creating a new Automation App, a generic device inventory API, direct fingerprint/change-device API, proxy update API, or a reliable GET task-list endpoint. These remain controlled discovery items.
 
 ## Device identity caution
 
@@ -48,6 +52,9 @@ Several devices report an Android release value that does not naturally match SD
 ## Remaining work
 
 - Run the official read-only API smoke against the installed 2.6.1 service.
+- Create one harmless GenFarmer Automation App in the UI if no suitable existing app is available.
+- Read that app back through the official API and capture its real `script.flow` node/edge schema.
+- Generate/update compatible no-code flows from Python once the schema is proven.
 - Capture actual response schemas and existing app/run IDs.
 - Resolve GenFarmer device ID and serial mapping for Device #1.
 - Execute one harmless authorized GenFarmer automation through the documented API.

@@ -2,13 +2,15 @@
 
 ## Status
 
-The Automation editor bundle `dist/render/assets/useScriptEditor-HioTuYH4.js` is now the primary source-discovery target. It contains every originally known Automation palette label and additional real-looking palette labels.
+Structured Electron/ASAR inspection has now recovered the Automation palette registry directly from renderer JavaScript ASTs.
 
-Static raw-token scanning of the whole `app.asar` was too noisy. Structured ASAR reading plus focused editor-bundle mining is materially better.
+The strongest current source result is `scripts/genfarmer_palette_registry_ast.py`, which found **42 distinct direct `label + action + icon` registry rows** across renderer assets. This is materially stronger than regex/proximity scanning because each row is an actual JavaScript object containing those three direct properties.
 
-## Live-observed actions
+The extractor also proved that many strings named `action*` are **icon identifiers**, not the semantic action. In 28/42 rows, the `icon` field contains values such as `actionPressBack`, `actionPause`, `actionScreenshot`, or `actionTypeText`, while the actual `action` field is a constant expression such as `H.PRESS_BACK`, `H.PAUSE`, `H.SCREENSHOT`, or `H.TYPE_TEXT`.
 
-These actions have been observed in a real saved `script.flow` and are therefore stronger than source-only candidates:
+## Live-observed saved actions
+
+These serialized `data.action` values have already been observed in real saved `script.flow` nodes and therefore remain the highest-confidence semantic evidence:
 
 - `Start`
 - `Variables`
@@ -18,122 +20,102 @@ These actions have been observed in a real saved `script.flow` and are therefore
 - `Pause`
 - `Screenshot`
 
-## Source-confirmed palette labels
+## AST-extracted palette registry
 
-The editor bundle contains all of these known labels:
+The following direct palette rows are source-proven in GenFarmer 2.6.1:
 
-- Press Back
-- Press Home
-- Press Menu
-- Change device
-- Start App
-- Stop App
-- Install App
-- Uninstall App
-- Variables
-- Context Menu
-- ADB shell command
-- Sleep
-- Screenshot
-- DeepSeek
+| UI label | Source action constant | Icon |
+|---|---|---|
+| ADB shell command | `H.ADB` | `terminal` |
+| Backup/Restore v2 | `H.BACKUP_RESTORE_V2` | `backupManager` |
+| Break Loop | `H.BREAK` | `actionBreak` |
+| Case Path | `H.CASE_PATH` | `actionCasePath` |
+| Change device | `H.CHANGE_DEVICE` | `deviceUnknown` |
+| Check Account Status | `H.CHECK_PLATFORM_ACCOUNT` | `search` |
+| Check activity | `H.CHECK_ACTIVITY` | `actionCheckActivity` |
+| Check network | `H.CHECK_NETWORK` | `globe` |
+| Clear App Data | `H.CLEAR_APP_DATA` | `clear` |
+| DeepSeek | `H.DEEPSEEK` | `tableAdd` |
+| Device actions | `H.DEVICE_ACTION` | `actionDeviceAction` |
+| Element exists | `H.ELEMENT_EXISTS` | `actionElementExists` |
+| Generate 2FA | `H.TWO_FA` | `actionTwoFA` |
+| Get attribute | `H.GET_ATTRIBUTE_VALUE` | `actionGetAttributeValue` |
+| Get property | `H.GET_PROPERTY` | `actionGetProperty` |
+| Group Node | `Ht.GROUP_NODE` | `fileZip` |
+| Image search | `H.IMAGE` | `actionImageSearch` |
+| IMAP (Read mail) | `H.IMAP` | `actionImap` |
+| Insert data | `H.INSERT_DATA` | `tableAdd` |
+| Install App | `H.INSTALL_APP` | `actionInstallApp` |
+| Is installed App | `H.IS_INSTALLED_APP` | `actionIsInstalledApp` |
+| Loop V2 | `H.LOOPV2` | `actionLoop` |
+| Multi Element exists | `H.MULTI_ELEMENT_EXISTS` | `actionElementExists` |
+| Open AI | `H.OPEN_AI` | `tableAdd` |
+| Press Back | `H.PRESS_BACK` | `actionPressBack` |
+| Press Home | `H.PRESS_HOME` | `actionPressHome` |
+| Press key | `H.PRESS` | `actionPress` |
+| Press Menu | `H.PRESS_MENU` | `actionPressMenu` |
+| Read file / variable | `H.READ_FILE` | `actionReadFile` |
+| RegExp (Data extraction) | `H.RegEx` | `actionRegExp` |
+| Save assets | `H.SAVE_ASSETS` | `actionSaveAssets` |
+| Screenshot | `H.SCREENSHOT` | `actionScreenshot` |
+| Set variable | `H.SET_VARIABLE` | `actionVariables` |
+| Sleep | `H.PAUSE` | `actionPause` |
+| Start App | `H.START_APP` | `play` |
+| Stop App | `H.STOP_APP` | `stop` |
+| Toggle service | `H.TOGGLE_SERVICE` | `actionToggleServiceAction` |
+| Transfer File | `H.TRANSFER_FILE` | `actionTransferFile` |
+| Type text | `H.TYPE_TEXT` | `actionTypeText` |
+| Uninstall App | `H.UNINSTALL_APP` | `trash` |
+| Update field | `H.UPDATE_FIELD` | `edit` |
+| Write file | `H.WRITE_FILE` | `actionWriteFile` |
 
-`Uninstall App` was discovered from source rather than supplied as an initial anchor, proving that the bundle can reveal additional palette entries.
+This is the first source-derived exact palette registry. It does **not** yet prove the final serialized `data.action` literal for every constant, nor the exact `script.flow` payload or settings schema for every node.
 
-## Strong additional source-discovered candidates
+## Corrected interpretation of `action*` tokens
 
-The palette cluster probe surfaced these human-facing labels with stronger evidence than generic UI controls:
+Earlier proximity probes treated tokens such as `actionTypeText`, `actionPause`, and `actionScreenshot` as possible semantic action identifiers. AST evidence corrects that interpretation: for many palette rows they are direct **icon values**.
 
-- Is installed App
-- Clear App Data
-- Transfer File
-- Device actions
-- Toggle service
-- Check activity
-- Press key
-- Type text
-- Update field
-- Get property
-- Element exists
-- Multi Element exists
-- Get attribute
-- Write file
-- Save assets
-- Set variable
-- Insert data
-- Open AI
-- Case Path
+The action field instead points at constants under namespaces such as `H` and `Ht`. The current task is therefore to resolve:
 
-These are **source-discovered candidates**, not yet serialized-template verified. They must not be treated as fully supported Python authoring primitives until a real GenFarmer-generated node/template confirms the exact `script.flow` payload.
+```text
+H.PAUSE      -> ?
+H.SCREENSHOT -> ?
+H.ADB        -> ?
+H.TYPE_TEXT  -> ?
+...
+```
 
-## Ambiguous implementation/palette tokens
+and validate those resolutions against live saved `script.flow` values where available.
 
-The same editor cluster also contains tokens such as:
+## Constant resolver
 
-- Cmd
-- Touch
-- Random
-- HTTP
-- Comment
-- Loop
-- While
-- Stop
-- Clipboard
-- Spreadsheet
-- Gemini
-- Grok
-- Javascript
-- Reconnect
-- Log
-- Xpath
-- GenRouter
+`scripts/genfarmer_action_constant_resolver.py` dynamically discovers the constants used by the palette registry and scans all renderer assets for their backing string mappings. It aggregates only constant/literal evidence and cross-checks known live anchors:
 
-These may be node names, internal action names, categories, settings modes, or helper implementations. They require action/label correlation before classification.
+- `ADB` expected live literal: `Adb`
+- `DEEPSEEK` expected live literal: `DeepSeek`
+- `PAUSE` expected live literal: `Pause`
+- `SCREENSHOT` expected live literal: `Screenshot`
 
-## Internal action evidence
-
-The editor bundle contains implementation-looking identifiers including:
-
-- `actionElementExists`
-- `actionVariables`
-- `actionLoop`
-
-This is important because it provides a path to correlate human-facing palette labels with internal semantic action identifiers. `scripts/genfarmer_action_label_probe.py` performs that correlation without publishing raw GenFarmer source.
+No unresolved constant is guessed.
 
 ## Settings-form controls
 
-The editor bundle also contains generic form-builder controls such as:
+The renderer also contains generic controls such as `Input`, `Input Number`, `Select`, `Switch`, `CheckBox`, `Radio`, `Slider`, `TextArea`, `File`, `Grid`, `Group`, `Layout`, `Divider`, `Alert`, and `HTML`.
 
-- Input
-- Input Number
-- Select
-- Switch
-- CheckBox
-- Radio
-- Slider
-- TextArea
-- File
-- Grid
-- Group
-- Layout
-- Divider
-- Alert
-- HTML
-
-These should not be counted as Automation nodes. They are useful because they likely describe the schema used to render per-node settings panels.
+These are settings UI primitives, not Automation nodes. Previous regex-based per-action settings probes were intentionally classified as noisy because shared editor/form code contaminated action neighborhoods. Settings attribution must now anchor on resolved semantic constants and/or exact saved GenFarmer nodes.
 
 ## Evidence hierarchy
 
-Use this confidence order:
-
 1. **Live saved `script.flow` template** — strongest; exact serialization observed.
-2. **Source label + internal action correlation** — useful for palette discovery, but payload still unverified.
-3. **Source-only human label** — likely palette candidate.
-4. **Ambiguous token** — discovery lead only.
+2. **AST palette row + resolved action constant** — strong source evidence for label-to-semantic-action mapping.
+3. **AST palette row with unresolved action constant** — exact palette membership, serialization still unknown.
+4. **Source-only token/proximity result** — discovery lead only.
 
 ## Next steps
 
-1. Run `scripts/genfarmer_action_label_probe.py` and correlate `action*` identifiers with human labels.
-2. Use resulting mappings to produce the first source-derived full palette catalog.
-3. Mine settings-property keys around each action and compare them with live `script.flow` option shapes.
-4. Create `GF Lab - Node Catalog` only for source-discovered nodes that still lack exact saved templates.
-5. Promote a node into the Python authoring registry only after its exact GenFarmer-generated template and required settings are verified.
+1. Run `scripts/genfarmer_action_constant_resolver.py` and resolve `H.*` / `Ht.*` constants to literals where the bundle proves them.
+2. Compare resolved literals against the seven live-observed `data.action` values.
+3. Produce a confidence-ranked label -> source constant -> serialized action catalog.
+4. Create `GF Lab - Node Catalog` only for nodes whose exact saved payload or settings remain unverified.
+5. Learn ambiguous settings with one-field-at-a-time private snapshots and masked diffs.
+6. Promote a node into the Python authoring registry only after exact GenFarmer-generated serialization is verified.

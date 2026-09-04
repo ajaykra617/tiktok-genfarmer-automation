@@ -39,14 +39,19 @@ Learn the GenFarmer 2.6.1 `script.flow` language exhaustively enough to create a
 - [x] Add a structured ASAR source probe that reads the Electron archive as files instead of one opaque 248 MB byte stream.
 - [x] Scan 16,170 text-bearing ASAR files and recover all 13 known Automation palette labels.
 - [x] Identify `dist/render/assets/useScriptEditor-HioTuYH4.js` as the strongest Automation editor bundle: it contains all 13 known palette anchors in one file.
-- [x] Add focused `genfarmer_node_registry_probe.py` to mine that bundle for likely node label/action/type/category associations and runtime option keys without emitting raw proprietary source.
+- [x] Add focused `genfarmer_node_registry_probe.py` and deep-bundle structural probe.
+- [x] Confirm the editor bundle has no source map.
+- [x] Discover `Uninstall App` as an additional real-looking Automation palette label not present in the original anchor set.
+- [x] Separate likely settings-form controls (`TextArea`, `Slider`, `Radio`, `Grid`, etc.) from Automation-node candidates.
+- [x] Add `genfarmer_palette_cluster_probe.py` to reconstruct minified palette string clusters and local editor module imports without emitting raw source.
 
 ## In progress
 
-- [ ] Run `scripts/genfarmer_node_registry_probe.py` against `dist/render/assets/useScriptEditor-HioTuYH4.js`.
-- [ ] Determine whether the bundle exposes the complete sidebar node registry in one pass.
+- [ ] Run `scripts/genfarmer_palette_cluster_probe.py` against `dist/render/assets/useScriptEditor-HioTuYH4.js`.
+- [ ] Recover sibling palette labels from merged string clusters around known Automation nodes.
+- [ ] Inventory local JS imports/chunks used by the editor and identify node-specific modules.
 - [ ] Pair palette labels with internal `data.action`/type/category identifiers where source evidence supports it.
-- [ ] Recover generic per-node configuration-key sets from the editor bundle and compare them with live `script.flow` templates.
+- [ ] Recover generic per-node configuration-key sets from the editor/settings bundles and compare them with live `script.flow` templates.
 - [ ] Download the official `GenFarmer.postman_collection.json` to ignored local evidence and run `scripts/genfarmer_postman_analyze.py`.
 - [ ] Compare collection endpoints/request schemas against the public GitBook baseline and our Python client.
 - [ ] Create `GF Lab - Node Catalog` only for nodes/settings that remain unverified after source-registry mining.

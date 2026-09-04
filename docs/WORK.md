@@ -12,12 +12,16 @@ Build a deterministic single-device automation foundation before scaling.
 - [x] Confirm GenFarmer fingerprint rotation.
 - [x] Confirm XProxy service and first-position proxy listeners.
 - [x] Separate public source code from client-specific local configuration.
+- [x] Create canonical public GitHub repository.
+- [x] Clone repository onto client Windows PC.
+- [x] Confirm client Python runtime is available.
+- [x] Confirm 20 Android devices are simultaneously visible to ADB.
+- [x] Add live ADB inventory script.
+- [x] Add safe single-device Android Settings smoke test with local evidence capture.
 
 ## In progress
 
-- [x] Create canonical public GitHub repository.
-- [ ] Clone repository onto client Windows PC.
-- [ ] Run safe Android automation smoke test.
+- [ ] Run the first safe smoke test against the selected Device #1.
 - [ ] Capture GenFarmer endpoint inventory.
 - [ ] Convert smoke workflow to GenFarmer API orchestration.
 
@@ -29,6 +33,7 @@ Build a deterministic single-device automation foundation before scaling.
 
 ## Later
 
+- [ ] Build local 20-device mapping without committing client IPs publicly.
 - [ ] Authorized application workflow.
 - [ ] Multi-device orchestration.
-- [ ] Scale to full device farm after stability.
+- [ ] Scale production workflows only after single-device stability.

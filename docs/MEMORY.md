@@ -15,6 +15,10 @@
 - Use a hybrid architecture: GenFarmer Automation Apps/no-code flows execute device actions, while Python orchestrates devices, inputs, runs, retries, evidence, XProxy checks, and higher-level workflow state.
 - The public API documents updating an Automation App's `script.flow`, but does not document a POST endpoint for creating a new Automation App. Safest bootstrap is to create one harmless app in the GenFarmer UI, read its app details, then learn/generate compatible flow JSON from Python.
 - Direct Python ADB/Appium-style automation remains possible, but it bypasses GenFarmer's native Automation App/Task/Run engine and is not the preferred primary execution path for this project.
+- Treat `script.flow` node schemas as version-specific and empirically verified. Do not invent undocumented node JSON from labels alone.
+- Learn `script.flow` exhaustively from three sources in order: official docs, the user's own accessible Automation App corpus, then a dedicated harmless `GF Lab - Node Catalog` app containing every missing visible palette node.
+- Raw client app flows remain local under git-ignored evidence and must not be committed. Only generic structural schemas, our own lab templates and reusable code belong in the public repository.
+- Python flow editing must be lossless: unknown node, edge and top-level flow fields are preserved exactly. New nodes should initially be cloned from real GenFarmer-generated templates of the same kind and only verified fields changed.
 
 ## Verified milestones
 
@@ -25,7 +29,9 @@
 - The process listening on the GenFarmer API port is `GenFarmer.exe`, product version `2.6.1.0`.
 - GenFarmer is Electron-packaged and includes `resources/app.asar`.
 - The public GenFarmer API documentation provides Local API examples using `127.0.0.1:55554` and documents Automation Apps, Tasks, Runs and current-user operations.
-- A reusable official-API client and read-only compatibility smoke script now exist in the repository.
+- A reusable official-API client and read-only compatibility smoke script exist in the repository.
+- The official API confirms that `script.flow` contains graph `nodes` and `edges`, but does not publish complete per-node JSON schemas.
+- A lossless Python `FlowDocument`, GET-only flow-corpus learner, shareable structural catalog, round-trip verifier and unit tests now exist.
 
 ## Official API coverage
 
@@ -43,7 +49,11 @@ Documented mutation operations include:
 - assign/remove devices on Tasks;
 - create and execute Runs.
 
-The public API page does not clearly document creating a new Automation App, a generic device inventory API, direct fingerprint/change-device API, proxy update API, or a reliable GET task-list endpoint. These remain controlled discovery items.
+The public API page does not clearly document creating a new Automation App, a generic device inventory API, direct fingerprint/change-device API, proxy update API, a reliable GET task-list endpoint, or the complete schema of every no-code node. These remain controlled discovery items.
+
+## Script.flow completion rule
+
+For GenFarmer 2.6.1, do not claim full Python flow generation/editing support until the full visible node palette has been cataloged, structural variants and edge/handle behavior are known, exact round-trip equality is proven, a harmless Python edit reloads correctly in the GenFarmer UI, and a harmless Python-generated flow executes successfully from verified templates.
 
 ## Device identity caution
 
@@ -52,9 +62,10 @@ Several devices report an Android release value that does not naturally match SD
 ## Remaining work
 
 - Run the official read-only API smoke against the installed 2.6.1 service.
-- Create one harmless GenFarmer Automation App in the UI if no suitable existing app is available.
-- Read that app back through the official API and capture its real `script.flow` node/edge schema.
-- Generate/update compatible no-code flows from Python once the schema is proven.
+- Run the GET-only `script.flow` learner across accessible apps and inspect the shareable structural catalog.
+- Create `GF Lab - Node Catalog` if existing apps do not cover every visible palette node.
+- Learn missing node defaults and field semantics one field at a time with harmless UI diffs.
+- Add versioned semantic Python adapters only after each node kind is verified.
 - Capture actual response schemas and existing app/run IDs.
 - Resolve GenFarmer device ID and serial mapping for Device #1.
 - Execute one harmless authorized GenFarmer automation through the documented API.

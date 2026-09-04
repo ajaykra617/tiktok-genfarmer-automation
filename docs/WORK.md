@@ -32,17 +32,20 @@ Learn the GenFarmer 2.6.1 `script.flow` language exhaustively enough to create a
 - [x] Run regex/proximity settings probes v1/v2 and classify them as too noisy for trustworthy per-node settings attribution.
 - [x] Add AST-based JavaScript probes and prove many `action*` tokens are icon values, not serialized actions.
 - [x] Add exact AST `label` + `action` + `icon` palette extraction.
-- [x] Expand exact source-derived palette coverage to 60 direct registry rows, including additional rows such as Clipboard, Cmd, Comment, Gemini, GenRouter, Grok, HTTP, If, Javascript, Log, Loop, Random, Reconnect, Spreadsheet, Stop, Swipe/Scroll, Touch and Xpath.
-- [x] Resolve 55 of 60 source action constants directly to literals in the first resolver pass.
-- [x] Cross-check live saved flow anchors: `H.ADB -> Adb`, `H.DEEPSEEK -> DeepSeek`, `H.PAUSE -> Pause`; `SCREENSHOT` remains source-ambiguous in V1 but exact live serialization is independently known as `Screenshot`.
-- [x] Add `genfarmer_action_constant_resolver_v2.py` to use fail-closed canonical-map consensus for ambiguous constants and explicit live-flow provenance where exact saved evidence already exists.
+- [x] Expand exact source-derived palette coverage to 60 direct registry rows, including Clipboard, Cmd, Comment, Gemini, GenRouter, Grok, HTTP, If, Javascript, Log, Loop, Random, Reconnect, Spreadsheet, Stop, Swipe/Scroll, Touch and Xpath.
+- [x] Run fail-closed action constant resolver V2 across 199 renderer assets.
+- [x] Resolve 56/60 palette actions with explicit provenance: 55 `unique-source` plus live `Screenshot` anchor.
+- [x] Validate all four live-known resolver anchors: `ADB -> Adb`, `DEEPSEEK -> DeepSeek`, `PAUSE -> Pause`, `SCREENSHOT -> Screenshot`.
+- [x] Keep ambiguous `HTTP`, `LOG`, `RANDOM`, and `STOP` unresolved; V2 correctly rejected conflicting candidate literals and accepted no canonical map.
+- [x] Add `genfarmer_node_factory_ast.py` to search exact palette constants for non-palette node-construction/default-schema objects, switch branches and computed handler maps.
 
 ## In progress
 
-- [ ] Run `scripts/genfarmer_action_constant_resolver_v2.py` and determine whether a canonical constant map resolves the remaining source ambiguity.
-- [ ] Keep `HTTP`, `LOG`, `RANDOM`, and `STOP` unresolved unless V2 finds conflict-free canonical evidence; do not infer values from names.
-- [ ] Build the confidence-ranked label -> source constant -> serialized `data.action` catalog.
-- [ ] Use exact action literals as anchors for per-node settings discovery.
+- [ ] Run `scripts/genfarmer_node_factory_ast.py` and determine how many actions expose source-side default `data/options` construction shapes.
+- [ ] Validate factory/default candidates against live Adb/Pause/Screenshot option-path shapes.
+- [ ] Build the confidence-ranked label -> source constant -> serialized `data.action` catalog with 56 resolved and 4 explicitly unresolved rows.
+- [ ] Use source factory/default evidence to reduce manual Node Catalog work; do not fabricate exact templates from source alone.
+- [ ] Resolve `HTTP`, `LOG`, `RANDOM`, and `STOP` from live saved nodes if source remains ambiguous.
 - [ ] Download the official `GenFarmer.postman_collection.json` to ignored local evidence and run `scripts/genfarmer_postman_analyze.py`.
 - [ ] Create `GF Lab - Node Catalog` only for actions/settings that still lack exact saved templates after source mining.
 - [ ] Run structural + semantic + routing learners against the Node Catalog app.
@@ -56,8 +59,8 @@ Learn the GenFarmer 2.6.1 `script.flow` language exhaustively enough to create a
 - **Live-verified serialization:** exact node exists in a saved GenFarmer `script.flow`.
 - **AST palette-registry row:** renderer object directly contains `label`, `action` and `icon` properties; strong source evidence for palette membership/action constant.
 - **Source-resolved literal:** source action constant is mapped to exactly one string literal by structural evidence.
-- **Canonical-map resolution:** V2 may resolve an otherwise ambiguous constant only from a large constant map that has zero conflicts with unique source evidence and live anchors.
-- **Source-discovered candidate:** token exists in the real editor source but lacks exact registry/serialization evidence.
+- **Live-flow anchor:** exact saved `script.flow` resolves an otherwise source-ambiguous constant.
+- **Factory/default candidate:** AST object or branch anchored to an exact palette constant exposes field/type shape, but is not an exact saved template until live round-trip evidence confirms it.
 - **Ambiguous token:** useful lead only; not promoted to the authoring registry.
 
 ## Specific semantics still to learn

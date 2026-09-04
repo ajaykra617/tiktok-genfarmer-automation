@@ -16,6 +16,8 @@
     "local-only script.flow template registry implemented",
     "versioned GenFarmer 2.6.1 semantic action registry implemented",
     "privacy-safe script.flow routing analyzer implemented",
+    "structured Electron app.asar source inspection implemented",
+    "Automation editor bundle identified and palette-source mining implemented",
     "GenFarmer fingerprint rotation previously proven",
     "XProxy service reachable",
     "first-position proxy listeners available"
@@ -34,21 +36,25 @@
     "Pause timeoutType=fixed is observed",
     "Start outbound edges use a generated source handle into target successNode",
     "normal success-chain edges use successNode to successNode",
-    "broad app.asar scan produced generic-code false positives",
-    "strict app.asar scan v2 recovered zero known live actions and zero package-only candidates, so static token scanning is not useful for full palette discovery",
-    "full action coverage must come from live GenFarmer-generated nodes",
+    "all three observed non-null successNode pointers match outgoing edge targets",
+    "dist/render/assets/useScriptEditor-HioTuYH4.js contains all original known palette labels and is the primary Automation editor source bundle",
+    "the editor bundle has no source map",
+    "source mining discovered additional real-looking palette labels including Uninstall App, Is installed App, Clear App Data, Transfer File, Device actions, Toggle service, Check activity, Press key, Type text, Update field, Get property, Element exists, Multi Element exists, Get attribute, Write file, Save assets, Set variable, Insert data, Open AI and Case Path",
+    "the editor bundle contains internal-looking identifiers including actionElementExists, actionVariables and actionLoop",
+    "generic form controls such as Input, Select, Switch, Slider, TextArea and Grid are settings UI primitives and must not be counted as Automation nodes",
     "verified node creation must clone exact local templates rather than fabricate undocumented payloads"
   ],
   "blockers": [
-    "full GenFarmer node palette has not yet been cataloged",
+    "full source-discovered palette has not yet been correlated to internal action identifiers and exact saved templates",
     "first cellular modem/SIM does not yet expose a verified mobile public IP"
   ],
   "next": [
-    "run private-corpus routing analysis to prove successNode and failNode edge relationships",
-    "create GF Lab - Node Catalog and add every visible palette node once",
-    "run structural and semantic learners against the Node Catalog app",
+    "run action-label correlation probe against the Automation editor bundle",
+    "build first source-derived full palette catalog with confidence levels",
+    "correlate settings/property keys with each internal action",
+    "create GF Lab - Node Catalog only for nodes still lacking exact GenFarmer-generated templates",
     "learn ambiguous options with one-field-at-a-time private snapshots and masked diffs",
-    "populate local template registry with verified GenFarmer 2.6.1 nodes",
+    "promote verified nodes into the GenFarmer 2.6.1 Python authoring registry",
     "prove a harmless Python-authored flow on Device #1"
   ]
 }

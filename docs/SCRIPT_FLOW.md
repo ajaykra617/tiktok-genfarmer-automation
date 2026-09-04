@@ -137,7 +137,46 @@ It does **not** expose node labels, IDs, selector text, commands, credentials, a
 content or arbitrary user-entered strings. This catalog is the main shareable artifact
 for building our Python node registry.
 
-### 4. Lossless round-trip gate
+### 4. Packaged palette/action discovery
+
+Live Automation Apps may not contain every action. GenFarmer 2.6.1 is Electron-packaged
+and stores the renderer/application code in `resources/app.asar`. Run:
+
+```powershell
+python scripts/genfarmer_palette_scan.py
+```
+
+The scanner reads the package in place and does not extract or modify it. It searches for
+strict token-like `action` declarations near automation-specific markers such as
+`nodeSleep`, `nodeTimeout`, `successNode`, `failNode`, `casePaths`,
+`sourcePosition`, and `targetPosition`.
+
+It produces only a shareable token/metadata report:
+
+```text
+evidence/genfarmer-palette-scan-.../palette-candidates.shareable.json
+```
+
+No raw proprietary source snippets are emitted. Static action candidates are **hints**, not
+verified node templates; a candidate becomes authorable only after it is observed in a real
+saved `script.flow` on GenFarmer 2.6.1.
+
+### 5. Local exact-template registry
+
+`src/genfarmer_automation/flow_registry.py` loads the private raw corpus locally and indexes
+exact GenFarmer-generated templates using the semantic key:
+
+```text
+<node.type>:<data.action>
+```
+
+and a structural signature for each observed variant.
+
+Until an action's complete schema is known, Python must create a node by cloning one of these
+real local templates and changing only verified fields. The registry never writes the raw
+corpus into Git or a shareable artifact.
+
+### 6. Lossless round-trip gate
 
 Before Python is allowed to update any flow, the parser must prove that it can
 read and serialize the flow without dropping or changing any field:
@@ -152,17 +191,18 @@ Required result:
 Exact dict equality after Python load/save: YES
 ```
 
-### 5. Full node-palette coverage
+### 7. Full node-palette coverage
 
-Existing apps do not necessarily contain every node. Create a dedicated lab app:
+Compare the live semantic catalog with the packaged palette/action candidate list first.
+For any palette action that still lacks a verified saved template, create a dedicated lab app:
 
 ```text
 GF Lab - Node Catalog
 ```
 
-Add every available node from the Automation node palette once and save the app.
-Use harmless synthetic configuration only. Do not attach real credentials or account data.
-Nodes may remain unconnected when GenFarmer permits it.
+Add the still-unobserved node types from the Automation palette once and save the app. Use
+harmless synthetic configuration only. Do not attach real credentials or account data. Nodes
+may remain unconnected when GenFarmer permits it.
 
 Then run both learners against the catalog app:
 
@@ -171,10 +211,10 @@ python scripts/genfarmer_flow_learn.py --app-id <NODE_CATALOG_APP_ID>
 python scripts/genfarmer_flow_semantics.py --app-id <NODE_CATALOG_APP_ID>
 ```
 
-The semantic output should split the generic `custom` family into the actual
-`data.action` operations.
+This gives the local template registry a real GenFarmer-generated template for each semantic
+action rather than relying on static package strings.
 
-### 6. One-field-at-a-time differential learning
+### 8. One-field-at-a-time differential learning
 
 For fields whose meaning is unclear, capture a private before snapshot:
 
@@ -201,14 +241,14 @@ The diff masks arbitrary strings and exposes raw values only for safe internal e
 handle paths. This lets us learn selectors, branch handles, time modes, variable references,
 booleans and other undocumented behavior without sharing client-specific flow content.
 
-### 7. Inspector-assisted selector learning
+### 9. Inspector-assisted selector learning
 
 GenFarmer Inspector exposes useful mobile element information such as package,
 activity, XPathLite, class name, coordinates, text, resource ID, description and
 element state. Selector-related node templates will be learned using synthetic
 or harmless UI targets first.
 
-### 8. Versioned Python node registry
+### 10. Versioned Python node registry
 
 After a semantic action is proven, add an adapter under the Python flow layer.
 The registry is versioned against GenFarmer 2.6.1. Unknown fields must always be
@@ -227,7 +267,9 @@ Safe progression:
 GET app
   -> exact script.flow snapshot
   -> parse losslessly
-  -> clone/patch verified node templates
+  -> resolve semantic action (type + data.action)
+  -> clone exact local template variant
+  -> patch only proven fields
   -> validate graph
   -> dry-run diff
   -> explicit authorized PUT

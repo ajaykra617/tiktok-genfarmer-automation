@@ -22,84 +22,56 @@ Learn the GenFarmer 2.6.1 `script.flow` language exhaustively enough to create a
 - [x] Prove `type=custom` is a rendering family rather than a unique automation action.
 - [x] Run semantic learner and identify seven real semantic actions: `Start`, `Variables`, `ContextMenu`, `Adb`, `DeepSeek`, `Pause`, `Screenshot`.
 - [x] Record `Pause.timeoutType=fixed` as an observed enum value.
-- [x] Record two observed edge-handle patterns: generated Start handle -> `successNode`, and `successNode` -> `successNode`.
-- [x] Add privacy-safe semantic catalog tooling.
-- [x] Add private before/after flow snapshots and shareable masked differential tooling.
-- [x] Add local-only node template registry keyed by `type + data.action` and structural variant.
-- [x] Add read-only `app.asar` palette/action scanners.
-- [x] Classify the first broad static palette scan as noisy/insufficient for action discovery.
-- [x] Run the strict V2 package scan: only 3 raw action-syntax matches, zero verified live actions recovered, zero package-only candidates.
-- [x] Add a versioned GenFarmer 2.6.1 semantic action registry for the seven observed actions.
-- [x] Run privacy-safe routing analysis against the private exact-flow corpus.
-- [x] Prove all 3 observed non-null `data.successNode` pointers match an outgoing edge target.
-- [x] Confirm no non-null `data.failNode` route exists yet in the current sample, so failure routing remains unproven.
-- [x] Confirm official GitBook API page publishes a downloadable `GenFarmer.postman_collection.json` collection.
-- [x] Add offline privacy-safe Postman collection analyzer.
-- [x] Attempt Chromium remote debugging and confirm GenFarmer rejects `--remote-debugging-port` with its own `Invalid args. Exiting...` handling.
-- [x] Add a structured ASAR source probe that reads the Electron archive as files instead of one opaque 248 MB byte stream.
-- [x] Scan 16,170 text-bearing ASAR files and recover all 13 known Automation palette labels.
-- [x] Identify `dist/render/assets/useScriptEditor-HioTuYH4.js` as the strongest Automation editor bundle: it contains all 13 known palette anchors in one file.
-- [x] Add focused `genfarmer_node_registry_probe.py` and deep-bundle structural probe.
+- [x] Record success-edge handle patterns and prove all observed non-null `successNode` pointers match outgoing edge targets.
+- [x] Add privacy-safe semantic catalog, snapshots, masked differential tooling and local-only node template registry.
+- [x] Add a versioned GenFarmer 2.6.1 semantic registry for live-observed actions.
+- [x] Confirm official GitBook API page publishes a downloadable `GenFarmer.postman_collection.json` collection and add an offline analyzer.
+- [x] Attempt Chromium remote debugging and confirm GenFarmer rejects `--remote-debugging-port` with its own argument parser.
+- [x] Add structured ASAR source inspection and scan 16,170 text-bearing files.
+- [x] Recover all 13 initial Automation palette labels from `resources/app.asar`.
+- [x] Identify `dist/render/assets/useScriptEditor-HioTuYH4.js` as the primary Automation editor source bundle.
 - [x] Confirm the editor bundle has no source map.
-- [x] Discover `Uninstall App` as an additional real-looking Automation palette label not present in the original anchor set.
-- [x] Separate likely settings-form controls (`TextArea`, `Slider`, `Radio`, `Grid`, etc.) from Automation-node candidates.
-- [x] Add `genfarmer_palette_cluster_probe.py` to reconstruct minified palette string clusters and local editor module imports without emitting raw source.
+- [x] Discover additional likely palette labels including `Uninstall App`, `Is installed App`, `Clear App Data`, `Transfer File`, `Device actions`, `Toggle service`, `Check activity`, `Press key`, `Type text`, `Update field`, `Get property`, `Element exists`, `Multi Element exists`, `Get attribute`, `Write file`, `Save assets`, `Set variable`, `Insert data`, `Open AI` and `Case Path`.
+- [x] Separate settings-form controls (`Input`, `Select`, `Switch`, `Slider`, `TextArea`, `Grid`, etc.) from Automation node candidates.
+- [x] Recover 37 internal `action*` identifiers from the Automation editor bundle.
+- [x] Obtain strong source correlations for obvious action/label pairs such as `actionPressBack` -> `Press Back`, `actionPressHome` -> `Press Home`, `actionPressMenu` -> `Press Menu`, `actionPause` -> `Sleep`, `actionScreenshot` -> `Screenshot`, `actionVariables` -> `Variables`, and `actionTypeText` -> `Type text`.
+- [x] Add `genfarmer_action_settings_probe.py` to mine per-action option/property keys, settings controls, runtime fields and asset chunks without exposing raw source.
 
 ## In progress
 
-- [ ] Run `scripts/genfarmer_palette_cluster_probe.py` against `dist/render/assets/useScriptEditor-HioTuYH4.js`.
-- [ ] Recover sibling palette labels from merged string clusters around known Automation nodes.
-- [ ] Inventory local JS imports/chunks used by the editor and identify node-specific modules.
-- [ ] Pair palette labels with internal `data.action`/type/category identifiers where source evidence supports it.
-- [ ] Recover generic per-node configuration-key sets from the editor/settings bundles and compare them with live `script.flow` templates.
+- [ ] Run `scripts/genfarmer_action_settings_probe.py` across renderer assets.
+- [ ] Build a confidence-ranked source-derived action -> UI label -> settings/options catalog.
+- [ ] Compare source-derived option keys against exact live `script.flow` templates.
 - [ ] Download the official `GenFarmer.postman_collection.json` to ignored local evidence and run `scripts/genfarmer_postman_analyze.py`.
-- [ ] Compare collection endpoints/request schemas against the public GitBook baseline and our Python client.
-- [ ] Create `GF Lab - Node Catalog` only for nodes/settings that remain unverified after source-registry mining.
+- [ ] Create `GF Lab - Node Catalog` only for actions/settings that still lack exact saved templates after source mining.
 - [ ] Run structural + semantic + routing learners against the Node Catalog app.
-- [ ] Populate the local template registry from the private exact-flow corpus.
-- [ ] Learn failure routing with one harmless failure edge.
-- [ ] Learn every ambiguous option using one-field-at-a-time snapshots/diffs.
+- [ ] Learn one harmless failure route and every ambiguous option with one-field-at-a-time snapshots/diffs.
 - [ ] Prove exact round-trip equality for the lab app.
 - [ ] Perform one harmless Python-generated edit and verify GenFarmer UI reloads it correctly.
 - [ ] Generate a harmless flow from verified templates and execute it on Device #1.
 
-## Currently verified semantic actions
+## Current evidence levels
 
-| Semantic kind | Family | Key observed options/behavior |
-|---|---|---|
-| `input:Start` | `input` | graph entry; generated Start handle routes into target `successNode` |
-| `helper:Variables` | `helper` | empty options object in first corpus |
-| `custom-context-menu:ContextMenu` | `custom-context-menu` | `casePaths` object observed |
-| `custom:Adb` | `custom` | command/outputVariable plus common runtime controls |
-| `custom:DeepSeek` | `custom` | common runtime controls observed |
-| `custom:Pause` | `custom` | timeout/fixed-range fields; `timeoutType=fixed` observed |
-| `custom:Screenshot` | `custom` | common runtime controls observed |
-
-These are structurally verified, not fully behaviorally modeled. Unknown options remain template-clone-only until differential tests prove their semantics.
+- **Live-verified serialization:** exact node exists in a saved GenFarmer `script.flow`.
+- **Source-correlated:** internal `action*` identifier and matching UI label are strongly associated in the editor bundle.
+- **Source-discovered candidate:** label/action token exists in the real editor source but does not yet have an exact saved template.
+- **Ambiguous token:** useful lead only; not promoted to the authoring registry.
 
 ## Specific semantics still to learn
 
-- [ ] app launch/stop/actions;
-- [ ] tap/click selector modes;
+- [ ] app launch/stop/install/uninstall/data-clear actions;
+- [ ] tap/touch selector modes;
 - [ ] text/resource-id/XPathLite/class/coordinates selectors;
 - [ ] random/range wait semantics;
 - [ ] swipe/scroll/gesture nodes;
-- [ ] input/type/paste nodes;
+- [ ] input/type/clipboard nodes;
 - [ ] variables/input/output/storage details;
 - [ ] conditions/branches/case-path handle semantics;
 - [ ] loops/retry/failure paths;
-- [ ] module/context/function nodes;
-- [ ] screenshot output/storage behavior;
-- [ ] image/vision nodes if present;
-- [ ] network/device/system nodes if present;
+- [ ] file/spreadsheet/HTTP/IMAP/AI nodes;
+- [ ] screenshot/image-search/asset-storage behavior;
+- [ ] network/device/system nodes;
 - [ ] defaults, required fields, optional fields and enum values for every action.
-
-## Official-doc gaps to resolve later
-
-- [ ] Generic device inventory endpoint is not clearly documented.
-- [ ] Fingerprint/change-device/profile API is not clearly documented.
-- [ ] Proxy update/assignment API is not clearly documented.
-- [ ] GET task-list endpoint is not clearly documented.
 
 ## External hardware dependency
 

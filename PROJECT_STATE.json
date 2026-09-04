@@ -18,6 +18,8 @@
     "privacy-safe script.flow routing analyzer implemented",
     "structured Electron app.asar source inspection implemented",
     "Automation editor bundle identified and palette-source mining implemented",
+    "37 internal action* identifiers discovered from the Automation editor bundle",
+    "per-action settings/options source probe implemented",
     "GenFarmer fingerprint rotation previously proven",
     "XProxy service reachable",
     "first-position proxy listeners available"
@@ -39,21 +41,21 @@
     "all three observed non-null successNode pointers match outgoing edge targets",
     "dist/render/assets/useScriptEditor-HioTuYH4.js contains all original known palette labels and is the primary Automation editor source bundle",
     "the editor bundle has no source map",
-    "source mining discovered additional real-looking palette labels including Uninstall App, Is installed App, Clear App Data, Transfer File, Device actions, Toggle service, Check activity, Press key, Type text, Update field, Get property, Element exists, Multi Element exists, Get attribute, Write file, Save assets, Set variable, Insert data, Open AI and Case Path",
-    "the editor bundle contains internal-looking identifiers including actionElementExists, actionVariables and actionLoop",
+    "source mining discovered additional likely palette labels including Uninstall App, Is installed App, Clear App Data, Transfer File, Device actions, Toggle service, Check activity, Press key, Type text, Update field, Get property, Element exists, Multi Element exists, Get attribute, Write file, Save assets, Set variable, Insert data, Open AI and Case Path",
+    "37 internal action identifiers are now source-discovered, including actionElementExists, actionVariables, actionLoop, actionTypeText, actionHttp, actionSwipe, actionImageSearch, actionSpreadsheet and actionClipboard",
+    "action-label correlation is strong for several obvious pairs such as actionPressBack/Press Back, actionPressHome/Press Home, actionPressMenu/Press Menu, actionPause/Sleep, actionScreenshot/Screenshot, actionVariables/Variables and actionTypeText/Type text",
     "generic form controls such as Input, Select, Switch, Slider, TextArea and Grid are settings UI primitives and must not be counted as Automation nodes",
-    "verified node creation must clone exact local templates rather than fabricate undocumented payloads"
+    "verified node creation must still clone exact local templates rather than fabricate undocumented payloads"
   ],
   "blockers": [
-    "full source-discovered palette has not yet been correlated to internal action identifiers and exact saved templates",
+    "full source-discovered action catalog has not yet been mapped to per-action settings and exact saved script.flow templates",
     "first cellular modem/SIM does not yet expose a verified mobile public IP"
   ],
   "next": [
-    "run action-label correlation probe against the Automation editor bundle",
-    "build first source-derived full palette catalog with confidence levels",
-    "correlate settings/property keys with each internal action",
-    "create GF Lab - Node Catalog only for nodes still lacking exact GenFarmer-generated templates",
-    "learn ambiguous options with one-field-at-a-time private snapshots and masked diffs",
+    "run per-action settings/options probe across renderer assets",
+    "build a confidence-ranked source-derived action-to-label-to-settings catalog",
+    "create GF Lab - Node Catalog only for actions still lacking exact GenFarmer-generated templates",
+    "learn ambiguous settings with one-field-at-a-time private snapshots and masked diffs",
     "promote verified nodes into the GenFarmer 2.6.1 Python authoring registry",
     "prove a harmless Python-authored flow on Device #1"
   ]

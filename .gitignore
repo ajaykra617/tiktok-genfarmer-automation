@@ -1,0 +1,12 @@
+.env
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+evidence/*
+!evidence/.gitkeep
+logs/*
+!logs/.gitkeep
+config/device-map.local.yaml
+config/local.yaml
+.vscode/settings.json

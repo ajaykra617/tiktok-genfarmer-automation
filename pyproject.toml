@@ -1,0 +1,8 @@
+[project]
+name = "tiktok-genfarmer-automation"
+version = "0.1.0"
+description = "Authorized Android automation using GenFarmer and XProxy"
+requires-python = ">=3.11"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

@@ -1,0 +1,8 @@
+devices:
+  - position: 1
+    name: device-01
+    adb_id: "DEVICE_IP:5555"
+    genfarmer_id: null
+    xproxy_position: 1
+    http_proxy: "XPROXY_LAN_IP:HTTP_PORT"
+    socks5_proxy: "XPROXY_LAN_IP:SOCKS5_PORT"

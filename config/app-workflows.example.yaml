@@ -1,0 +1,10 @@
+workflows:
+  android_settings_smoke:
+    enabled: true
+    package: "com.android.settings"
+    requires_mobile_proxy: false
+
+  tiktok_authorized:
+    enabled: false
+    package: "com.zhiliaoapp.musically"
+    requires_mobile_proxy: true

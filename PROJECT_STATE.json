@@ -1,0 +1,21 @@
+{
+  "project": "TikTok Automation / GenFarmer",
+  "visibility": "public-source-private-client-config",
+  "phase": "single-device-foundation",
+  "verified_capabilities": [
+    "single-device ADB control",
+    "GenFarmer API reachable",
+    "GenFarmer fingerprint rotation",
+    "XProxy service reachable",
+    "first-position proxy listeners available"
+  ],
+  "blockers": [
+    "first cellular modem/SIM does not yet expose a verified mobile public IP"
+  ],
+  "next": [
+    "clone on client PC",
+    "safe Android smoke automation",
+    "GenFarmer API endpoint discovery",
+    "GenFarmer API-driven smoke workflow"
+  ]
+}

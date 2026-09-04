@@ -26,16 +26,19 @@ Learn the GenFarmer 2.6.1 `script.flow` language exhaustively enough to create a
 - [x] Add privacy-safe semantic catalog tooling.
 - [x] Add private before/after flow snapshots and shareable masked differential tooling.
 - [x] Add local-only node template registry keyed by `type + data.action` and structural variant.
-- [x] Add read-only `app.asar` palette/action scanner.
+- [x] Add read-only `app.asar` palette/action scanners.
 - [x] Classify the first broad static palette scan as noisy/insufficient for action discovery.
-- [x] Add a stricter package scanner that only considers PascalCase `action:` tokens and scores GenFarmer runtime markers.
+- [x] Run the strict V2 package scan: only 3 raw action-syntax matches, zero verified live actions recovered, zero package-only candidates.
+- [x] Conclude static `app.asar` token scanning is not a reliable way to enumerate the GenFarmer node palette in this build.
 - [x] Add a versioned GenFarmer 2.6.1 semantic action registry for the seven observed actions.
+- [x] Add privacy-safe routing analysis to prove `successNode`/`failNode` pointer-to-edge relationships from the exact local corpus.
 
 ## In progress
 
-- [ ] Run `scripts/genfarmer_palette_scan_v2.py` against GenFarmer 2.6.1.
-- [ ] Compare strict package-only candidates with the seven verified live actions.
-- [ ] Create `GF Lab - Node Catalog` only for actions still lacking a live saved template.
+- [ ] Run `scripts/genfarmer_flow_route_analyze.py` against the private exact-flow corpus.
+- [ ] Prove whether every observed `data.successNode` points to an outgoing edge target.
+- [ ] Capture failure-route semantics if any non-null `data.failNode` exists.
+- [ ] Create `GF Lab - Node Catalog` in the GenFarmer UI for full live palette coverage.
 - [ ] Add every still-unobserved visible node-palette item once using harmless synthetic configuration.
 - [ ] Run structural + semantic learners against the Node Catalog app.
 - [ ] Populate the local template registry from the private exact-flow corpus.

@@ -15,6 +15,28 @@ git log -1 --oneline
 
 The client PC does not need GitHub authentication for clone/pull because the repository is public. Local-only files remain ignored by Git.
 
+## Local development/test setup
+
+The runtime scripts are intentionally mostly standard-library Python. Test tooling is declared separately as the `dev` extra.
+
+Install or refresh development dependencies from the repository root:
+
+```powershell
+python -m pip install -e ".[dev]"
+```
+
+Verify pytest is available:
+
+```powershell
+python -m pytest --version
+```
+
+Run the project tests:
+
+```powershell
+python -m pytest
+```
+
 ## Local configuration
 
 Create once:

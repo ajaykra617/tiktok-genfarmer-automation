@@ -17,12 +17,16 @@ Move from proven single-device control into verified GenFarmer API integration.
 - [x] Confirm GenFarmer local service is reachable.
 - [x] Identify GenFarmer service version as 2.6.1 from `GET /`.
 - [x] Confirm common Swagger/OpenAPI/health/version metadata paths are not exposed.
-- [x] Add read-only GenFarmer process/route discovery tooling.
+- [x] Identify the API listener process as `GenFarmer.exe` version `2.6.1.0`.
+- [x] Identify the local install root under the user's Local Programs directory.
+- [x] Confirm loose text assets do not expose route-like strings.
+- [x] Add deeper read-only packaged-application inspection for `app.asar`/embedded resources.
 
 ## In progress
 
-- [ ] Identify the Windows process/executable serving the GenFarmer API.
-- [ ] Discover route candidates from local GenFarmer assets without modifying them.
+- [ ] Determine GenFarmer desktop packaging layout (Electron/Tauri/other).
+- [ ] Discover route candidates from packaged GenFarmer resources without modifying them.
+- [ ] Confirm candidate routes using read-only requests or observation before any mutation calls.
 - [ ] Map GenFarmer device IDs to local ADB devices.
 - [ ] Build the first reusable GenFarmer Python client.
 - [ ] Convert the safe smoke workflow from direct ADB orchestration to GenFarmer orchestration where supported.

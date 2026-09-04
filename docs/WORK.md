@@ -20,11 +20,10 @@ Learn the GenFarmer 2.6.1 `script.flow` language exhaustively enough to create a
 - [x] Run first read-only `script.flow` corpus pass.
 - [x] First corpus: 1 app, 7 nodes, 3 edges, 4 broad Vue Flow families.
 - [x] Prove `type=custom` is a rendering family rather than a unique automation action.
-- [x] Run semantic learner and identify seven real semantic actions: `Start`, `Variables`, `ContextMenu`, `Adb`, `DeepSeek`, `Pause`, `Screenshot`.
+- [x] Run semantic learner and identify seven real serialized semantic actions: `Start`, `Variables`, `ContextMenu`, `Adb`, `DeepSeek`, `Pause`, `Screenshot`.
 - [x] Record `Pause.timeoutType=fixed` as an observed enum value.
 - [x] Record success-edge handle patterns and prove all observed non-null `successNode` pointers match outgoing edge targets.
 - [x] Add privacy-safe semantic catalog, snapshots, masked differential tooling and local-only node template registry.
-- [x] Add a versioned GenFarmer 2.6.1 semantic registry for live-observed actions.
 - [x] Confirm official GitBook API page publishes a downloadable `GenFarmer.postman_collection.json` collection and add an offline analyzer.
 - [x] Attempt Chromium remote debugging and confirm GenFarmer rejects `--remote-debugging-port` with its own argument parser.
 - [x] Add structured ASAR source inspection and scan 16,170 text-bearing files.
@@ -33,15 +32,18 @@ Learn the GenFarmer 2.6.1 `script.flow` language exhaustively enough to create a
 - [x] Confirm the editor bundle has no source map.
 - [x] Discover additional likely palette labels including `Uninstall App`, `Is installed App`, `Clear App Data`, `Transfer File`, `Device actions`, `Toggle service`, `Check activity`, `Press key`, `Type text`, `Update field`, `Get property`, `Element exists`, `Multi Element exists`, `Get attribute`, `Write file`, `Save assets`, `Set variable`, `Insert data`, `Open AI` and `Case Path`.
 - [x] Separate settings-form controls (`Input`, `Select`, `Switch`, `Slider`, `TextArea`, `Grid`, etc.) from Automation node candidates.
-- [x] Recover 37 internal `action*` identifiers from the Automation editor bundle.
-- [x] Obtain strong source correlations for obvious action/label pairs such as `actionPressBack` -> `Press Back`, `actionPressHome` -> `Press Home`, `actionPressMenu` -> `Press Menu`, `actionPause` -> `Sleep`, `actionScreenshot` -> `Screenshot`, `actionVariables` -> `Variables`, and `actionTypeText` -> `Type text`.
-- [x] Add `genfarmer_action_settings_probe.py` to mine per-action option/property keys, settings controls, runtime fields and asset chunks without exposing raw source.
+- [x] Run regex/proximity settings probes v1/v2 and classify them as too noisy for trustworthy per-node settings attribution.
+- [x] Add an AST-based JavaScript probe and classify 63 `action*` tokens across 18 renderer assets.
+- [x] Correct the earlier interpretation of `action*` tokens: several key examples (`actionPressBack`, `actionPressHome`, `actionPressMenu`, `actionScreenshot`, `actionTypeText`, `actionMouseMove`) occur as `icon` values in palette-registry-shaped objects, so `action*` must not be treated as serialized `data.action` values.
+- [x] Recover stronger source action constants such as `PRESS_BACK`, `PRESS_HOME`, `PRESS_MENU`, `PRESS`, `TYPE_TEXT`, `TOUCH`, `SWIPE`, `SCREENSHOT`, `CHANGE_DEVICE`, `START_APP`, `STOP_APP`, `INSTALL_APP`, `UNINSTALL_APP`, `ADB`, `CHECK_NETWORK`, `BACKUP_RESTORE_V2`, `GEN_ROUTER`, and `CMD` from the same structural contexts.
+- [x] Add `genfarmer_palette_registry_ast.py` to extract exact `label` + `action` + `icon` object rows and locally resolvable action constants without dumping raw source.
 
 ## In progress
 
-- [ ] Run `scripts/genfarmer_action_settings_probe.py` across renderer assets.
-- [ ] Build a confidence-ranked source-derived action -> UI label -> settings/options catalog.
-- [ ] Compare source-derived option keys against exact live `script.flow` templates.
+- [ ] Run `scripts/genfarmer_palette_registry_ast.py` and build the first exact source-derived palette registry table.
+- [ ] Determine which palette `action` values are direct identifiers/constants versus strings and resolve local constant bindings where possible.
+- [ ] Cross-check source registry action constants against the seven exact live `script.flow data.action` values.
+- [ ] Use exact palette rows, not `action*` icon tokens, as the source anchor for per-node settings discovery.
 - [ ] Download the official `GenFarmer.postman_collection.json` to ignored local evidence and run `scripts/genfarmer_postman_analyze.py`.
 - [ ] Create `GF Lab - Node Catalog` only for actions/settings that still lack exact saved templates after source mining.
 - [ ] Run structural + semantic + routing learners against the Node Catalog app.
@@ -53,8 +55,8 @@ Learn the GenFarmer 2.6.1 `script.flow` language exhaustively enough to create a
 ## Current evidence levels
 
 - **Live-verified serialization:** exact node exists in a saved GenFarmer `script.flow`.
-- **Source-correlated:** internal `action*` identifier and matching UI label are strongly associated in the editor bundle.
-- **Source-discovered candidate:** label/action token exists in the real editor source but does not yet have an exact saved template.
+- **AST palette-registry row:** renderer object directly contains `label`, `action` and `icon` properties; strong source evidence for palette membership/action constant.
+- **Source-discovered candidate:** label/token exists in the real editor source but does not yet have an exact registry row or saved template.
 - **Ambiguous token:** useful lead only; not promoted to the authoring registry.
 
 ## Specific semantics still to learn

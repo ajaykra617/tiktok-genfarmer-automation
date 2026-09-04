@@ -1,7 +1,7 @@
 {
   "project": "TikTok Automation / GenFarmer",
   "visibility": "public-source-private-client-config",
-  "phase": "official-genfarmer-api-integration",
+  "phase": "genfarmer-script-flow-learning",
   "verified_capabilities": [
     "20 Android devices visible simultaneously to ADB",
     "safe Device #1 Settings smoke workflow passed with local evidence",
@@ -10,13 +10,19 @@
     "GenFarmer listener identified as GenFarmer.exe 2.6.1.0",
     "official GenFarmer Local API documentation located",
     "reusable documented-API Python client implemented with fail-closed mutations",
+    "official API confirms Automation App script.flow contains nodes and edges",
+    "lossless Python script.flow model implemented",
+    "GET-only flow corpus learner and shareable structural catalog implemented",
+    "GET-only exact flow round-trip verifier implemented",
     "GenFarmer fingerprint rotation previously proven",
     "XProxy service reachable",
     "first-position proxy listeners available"
   ],
   "current_findings": [
     "official docs cover current user plus Automation Apps, Tasks and Runs",
-    "official docs do not clearly expose generic device inventory, fingerprint/profile, proxy update, or reliable GET task-list APIs",
+    "official docs expose script.flow but do not enumerate complete per-node JSON schemas",
+    "full node support must be learned version-specifically from observed GenFarmer-generated flows",
+    "official docs do not clearly expose generic device inventory, fingerprint/profile, proxy update, create-app, or reliable GET task-list APIs",
     "some Android identity properties are inconsistent with SDK 35 and require profile-vs-system comparison"
   ],
   "blockers": [
@@ -24,9 +30,10 @@
   ],
   "next": [
     "run official documented GET-only API smoke against GenFarmer 2.6.1",
-    "capture actual current-user/app/run response schemas",
-    "resolve GenFarmer device ID and serial mapping for Device #1",
-    "execute one harmless authorized GenFarmer automation via documented API",
-    "resolve undocumented fingerprint/proxy surfaces only as needed"
+    "run GET-only script.flow learner across accessible Automation Apps",
+    "analyze flow-catalog.shareable.json and identify missing visible palette nodes",
+    "create a harmless GF Lab - Node Catalog app if palette coverage is incomplete",
+    "prove exact Python round-trip for a harmless app",
+    "build verified semantic node adapters and execute one harmless generated flow"
   ]
 }

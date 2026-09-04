@@ -10,6 +10,7 @@
 - Basic device automation can proceed while modem/SIM hardware is repaired.
 - Proxy-required application jobs fail closed unless a verified cellular public IP exists.
 - Prefer observation and read-only discovery before guessing GenFarmer API routes.
+- When loose application files do not expose routes, inspect packaged resources read-only before attempting active endpoint discovery.
 
 ## Verified milestones
 
@@ -18,6 +19,9 @@
 - Device #1 UI was readable through UiAutomator; the visible Settings UI was French-localized.
 - GenFarmer root endpoint identifies the local service as version 2.6.1.
 - Common health/version/Swagger/OpenAPI paths tested by the read-only discovery script returned 404.
+- The process listening on the GenFarmer API port is `GenFarmer.exe`, product version `2.6.1.0`.
+- The executable is installed in the user's Local Programs GenFarmer directory.
+- The initial loose-text scan covered three nearby text files and found zero route-like strings.
 
 ## Device identity caution
 
@@ -25,7 +29,8 @@ Several devices report an Android release value that does not naturally match SD
 
 ## Remaining work
 
-- Discover the GenFarmer listener process and local route surface.
+- Determine whether the GenFarmer desktop package is Electron, Tauri, or another layout.
+- Inspect packaged resources such as `app.asar`/embedded assets for route candidates without modifying them.
 - Complete GenFarmer endpoint inventory.
 - Map GenFarmer device identifiers to ADB devices.
 - Implement reusable GenFarmer client/orchestration.

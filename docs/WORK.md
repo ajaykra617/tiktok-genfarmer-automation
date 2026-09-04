@@ -18,11 +18,15 @@ Build a deterministic single-device automation foundation before scaling.
 - [x] Confirm 20 Android devices are simultaneously visible to ADB.
 - [x] Add live ADB inventory script.
 - [x] Add safe single-device Android Settings smoke test with local evidence capture.
+- [x] Run the first safe smoke test against selected Device #1: PASS.
+- [x] Verify Settings launch, UI hierarchy read, evidence capture, and return-to-Home behavior.
+- [x] Add read-only GenFarmer API discovery probe.
 
 ## In progress
 
-- [ ] Run the first safe smoke test against the selected Device #1.
-- [ ] Capture GenFarmer endpoint inventory.
+- [ ] Run GenFarmer read-only API discovery on the client PC.
+- [ ] Capture confirmed endpoint inventory and schemas.
+- [ ] Investigate Android identity coherence: reported release and SDK values were inconsistent in the smoke result.
 - [ ] Convert smoke workflow to GenFarmer API orchestration.
 
 ## External hardware dependency

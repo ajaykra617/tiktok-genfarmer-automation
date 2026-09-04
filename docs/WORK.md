@@ -23,15 +23,19 @@ Learn the GenFarmer 2.6.1 `script.flow` language exhaustively enough to create a
 - [x] Identify `data.action` as a key semantic discriminator to catalog next.
 - [x] Add privacy-safe semantic catalog tooling.
 - [x] Add private before/after flow snapshots and shareable masked differential tooling.
+- [x] Add local-only node template registry keyed by `type + data.action` and structural variant.
+- [x] Add read-only `app.asar` palette/action scanner to discover likely automation actions not present in current apps.
 
 ## In progress
 
 - [ ] Run `scripts/genfarmer_flow_semantics.py` against the existing app corpus.
-- [ ] Capture the distinct `data.action` operations hidden under `type=custom`.
-- [ ] Create `GF Lab - Node Catalog` in the GenFarmer UI.
-- [ ] Add every visible node-palette item once using harmless synthetic configuration.
+- [ ] Run `scripts/genfarmer_palette_scan.py` against GenFarmer 2.6.1 packaged resources.
+- [ ] Compare live `data.action` values with packaged palette/action candidates.
+- [ ] Capture the distinct operations hidden under `type=custom`.
+- [ ] Create `GF Lab - Node Catalog` in the GenFarmer UI only for nodes still missing after static/live discovery.
+- [ ] Add every still-unobserved visible node-palette item once using harmless synthetic configuration.
 - [ ] Run structural + semantic learners against the Node Catalog app.
-- [ ] Build a versioned node-template registry for GenFarmer 2.6.1.
+- [ ] Populate the local template registry from the private exact-flow corpus.
 - [ ] Learn every ambiguous option using one-field-at-a-time snapshots/diffs.
 - [ ] Prove exact round-trip equality for the lab app.
 - [ ] Perform one harmless Python-generated edit and verify GenFarmer UI reloads it correctly.

@@ -15,11 +15,12 @@
 - All GenFarmer POST/PUT/DELETE methods in our Python client are fail-closed by default and require explicit mutation opt-in.
 - Use a hybrid architecture: GenFarmer Automation Apps/no-code flows execute device actions, while Python orchestrates devices, inputs, runs, retries, evidence, XProxy checks, and higher-level workflow state.
 - Learn `script.flow` from GenFarmer-generated graphs before Python authors them. Clone verified templates and patch only fields whose semantics are proven.
-- Treat broad Vue Flow `type` values as rendering families. The first semantic pass proves the actual operation identity is `type + data.action`.
-- Exact raw flows remain local under ignored `evidence/`. Share only structural catalogs, safe internal action tokens, and masked differential reports.
+- Treat broad Vue Flow `type` values as rendering families. Exact operation identity in saved flows is `type + data.action`.
+- Exact raw flows remain local under ignored `evidence/`. Share only structural catalogs, safe action tokens and masked differential reports.
 - The local Python template registry must load exact node templates only from the private raw corpus. It must never embed or publish raw client flows in Git.
-- Static `app.asar` scans are not authoritative. V1 produced generic-code false positives; V2 found only three strict action-syntax matches, recovered none of the seven live actions, and produced no package-only candidates. Do not spend more time trying to enumerate the palette from raw package token scans unless a stronger extraction method becomes available.
-- Full node coverage must therefore come from live GenFarmer-generated nodes in a dedicated lab Automation App.
+- Source mining is discovery evidence, not serialization authority. Only a saved GenFarmer `script.flow` proves the exact `data.action` and option payload for authoring.
+- Do not treat `action*` renderer tokens as serialized actions without AST proof. The AST run showed several of them are `icon` values in palette-registry-shaped objects.
+- Use exact renderer objects containing direct `label`, `action` and `icon` properties as the strongest source-level palette registry evidence.
 - Before authoring edges, prove routing relationships from the private corpus: specifically whether `data.successNode`/`data.failNode` correspond to outgoing edge targets and which handle names are used.
 - Versioned semantic registries may contain only privacy-safe action names, field/type shapes, observed enum values and handle semantics.
 
@@ -31,7 +32,7 @@
 - The process listening on the GenFarmer API port is `GenFarmer.exe`, product version `2.6.1.0`.
 - GenFarmer is Electron-packaged and includes `resources/app.asar`.
 - The public GenFarmer API documentation provides Local API examples using `127.0.0.1:55554` and documents Automation Apps, Tasks, Runs and current-user operations.
-- The official API page publishes a 41 KB Postman collection named `GenFarmer.postman_collection.json`.
+- The official API page publishes a Postman collection named `GenFarmer.postman_collection.json`.
 - A reusable documented-API client and read-only compatibility smoke script exist in the repository.
 - A lossless `script.flow` wrapper, round-trip gate, structural learner, semantic learner, private snapshot tool and privacy-safe diff tool exist.
 - First flow corpus: one app, seven nodes, three edges and four broad families (`custom`, `custom-context-menu`, `helper`, `input`).
@@ -42,26 +43,31 @@
 - All three observed non-null `data.successNode` pointers match an outgoing edge target exactly.
 - No non-null `data.failNode` route exists in the current sample, so failure routing remains unproven.
 - A local-only `TemplateRegistry` indexes exact observed node templates by `type + data.action`.
-- A versioned privacy-safe GenFarmer 2.6.1 semantic registry records the seven observed actions.
-- The strict V2 package scan is inconclusive for palette discovery: zero live actions recovered and zero package-only candidates.
-- A privacy-safe local routing analyzer aggregates pointer/edge/handle relationships without exposing node IDs or app logic.
-- An offline privacy-safe Postman collection analyzer now extracts methods/paths, request and response JSON field/type shapes, variable/header/query names, collection-vs-public-baseline endpoint deltas, and any real `script.flow` examples without copying values.
+- Structured ASAR inspection scanned 16,170 text-bearing files and identified `dist/render/assets/useScriptEditor-HioTuYH4.js` as the primary Automation editor bundle.
+- The editor bundle has no source map.
+- Source mining surfaced additional likely palette labels beyond the original live sample, including app/system, interaction, data, file, AI and branching nodes.
+- Regex/proximity settings probes v1 and v2 were deliberately rejected as too noisy for trustworthy per-node settings attribution.
+- AST analysis parsed 18 renderer assets without parse-error roots and classified 63 `action*` tokens.
+- AST contexts show several `action*` values are icons, not semantic actions. Examples: `actionPressBack`, `actionPressHome`, `actionPressMenu`, `actionScreenshot`, `actionTypeText`, and `actionMouseMove`.
+- Stronger source action constants visible alongside labels include `PRESS_BACK`, `PRESS_HOME`, `PRESS_MENU`, `PRESS`, `TYPE_TEXT`, `TOUCH`, `SWIPE`, `SCREENSHOT`, `CHANGE_DEVICE`, `START_APP`, `STOP_APP`, `INSTALL_APP`, `UNINSTALL_APP`, `ADB`, `CHECK_NETWORK`, `BACKUP_RESTORE_V2`, `GEN_ROUTER`, and `CMD`.
+- `genfarmer_palette_registry_ast.py` now extracts exact source rows shaped as `label` + `action` + `icon` and resolves simple local uppercase action bindings where possible.
 
 ## Script.flow learning strategy
 
 1. Read existing apps GET-only.
 2. Preserve exact raw flows locally.
 3. Build shareable structural and semantic catalogs.
-4. Record only live-observed actions in the versioned semantic registry.
+4. Record only live-observed serialized actions in the versioned semantic registry.
 5. Mine the private corpus for routing semantics before generating edges.
 6. Analyze the official Postman collection for API-contract details and any real flow examples.
-7. Create `GF Lab - Node Catalog` and add every visible palette node once with harmless synthetic values where required.
-8. Re-run structural + semantic + routing learners against that lab app.
-9. Load exact templates into the local-only template registry; do not fabricate undocumented node payloads.
-10. For ambiguous options, snapshot before, change exactly one UI field, snapshot after, and produce a masked shareable diff.
-11. Require exact Python round-trip equality before any flow PUT.
-12. Add semantic Python helpers only after the relevant action behavior is proven on GenFarmer 2.6.1.
-13. Run harmless generated/edit flows on Device #1 before using any authorized application workflow.
+7. Mine the Electron renderer using AST, prioritizing exact `label/action/icon` palette rows over proximity heuristics.
+8. Cross-map source action constants to exact saved `script.flow data.action` values.
+9. Create `GF Lab - Node Catalog` only for actions/settings that remain unverified.
+10. Load exact templates into the local-only template registry; do not fabricate undocumented node payloads.
+11. For ambiguous options, snapshot before, change exactly one UI field, snapshot after, and produce a masked shareable diff.
+12. Require exact Python round-trip equality before any flow PUT.
+13. Add semantic Python helpers only after the relevant action behavior is proven on GenFarmer 2.6.1.
+14. Run harmless generated/edit flows on Device #1 before using any authorized application workflow.
 
 ## Current verified semantic actions
 
@@ -79,7 +85,7 @@ These are structurally verified. Their complete runtime semantics are not assume
 
 Documented read operations include current user, list/get Automation Apps, list Automation Runs, and run storage/output retrieval. Documented mutation operations include updating/deleting Automation Apps, creating/updating/deleting Tasks, assigning/removing devices, creating Runs and executing Runs.
 
-The public API page does not clearly document creating a new Automation App, a generic device inventory API, direct fingerprint/change-device API, proxy update API, or a reliable GET task-list endpoint. The official Postman collection must now be checked specifically for any additional or corrected endpoints before we classify those as true API gaps.
+The public API page does not clearly document creating a new Automation App, a generic device inventory API, direct fingerprint/change-device API, proxy update API, or a reliable GET task-list endpoint. The official Postman collection still needs to be checked for additional or corrected endpoints before those are classified as true API gaps.
 
 ## Device identity caution
 
@@ -87,12 +93,12 @@ Several devices report Android release values that do not naturally match SDK 35
 
 ## Remaining work
 
-- Download the official Postman collection locally and run the new analyzer.
-- Compare collection endpoints and schemas against the public GitBook page and our client.
-- Check whether the collection contains non-empty `script.flow` examples.
-- Create/populate `GF Lab - Node Catalog` with every still-unobserved visible action.
+- Run `scripts/genfarmer_palette_registry_ast.py` and capture the exact source-derived palette table.
+- Cross-map source action constants to saved `script.flow data.action` values.
+- Download and analyze the official Postman collection.
+- Create/populate `GF Lab - Node Catalog` only for nodes still lacking exact templates.
 - Learn one real failure route and every ambiguous option through differential tests.
-- Build the complete GenFarmer 2.6.1 node/action registry using live templates and differential learning.
+- Build the complete GenFarmer 2.6.1 Python authoring registry from verified templates.
 - Prove a harmless Python edit and generated flow through GenFarmer.
 - Resolve GenFarmer device ID mapping.
 - Resolve undocumented fingerprint and proxy integration surfaces only as needed.

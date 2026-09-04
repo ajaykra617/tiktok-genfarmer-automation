@@ -13,6 +13,8 @@
     "lossless script.flow reader/editor and round-trip gate implemented",
     "structural script.flow learner executed successfully",
     "privacy-safe semantic learner and differential tooling implemented",
+    "local-only script.flow template registry implemented",
+    "read-only packaged palette/action scanner implemented",
     "GenFarmer fingerprint rotation previously proven",
     "XProxy service reachable",
     "first-position proxy listeners available"
@@ -20,8 +22,9 @@
   "current_findings": [
     "first flow corpus contains 1 app, 7 nodes, 3 edges and 4 broad Vue Flow families",
     "4 nodes share type=custom so node.type is not the unique automation action identity",
-    "data.action must be cataloged as the semantic operation discriminator",
-    "observed flow fields include success/failure routing, timeout/sleep/breakpoint/disabled options and handle metadata"
+    "data.action is the primary semantic operation discriminator to verify",
+    "observed flow fields include success/failure routing, timeout/sleep/breakpoint/disabled options and handle metadata",
+    "verified node creation should clone exact local templates rather than fabricate undocumented payloads"
   ],
   "blockers": [
     "full GenFarmer node palette has not yet been cataloged",
@@ -29,10 +32,10 @@
   ],
   "next": [
     "run privacy-safe semantic catalog to capture real data.action operations",
-    "create GF Lab - Node Catalog and add every visible palette node once",
-    "run structural and semantic learners against the Node Catalog app",
+    "run read-only app.asar palette/action scan and compare with live flow actions",
+    "create GF Lab - Node Catalog only for still-unobserved palette actions",
     "learn ambiguous options with one-field-at-a-time private snapshots and masked diffs",
-    "build versioned Python node template registry for GenFarmer 2.6.1",
+    "populate the local template registry with verified GenFarmer 2.6.1 nodes",
     "prove a harmless Python-authored flow on Device #1"
   ]
 }

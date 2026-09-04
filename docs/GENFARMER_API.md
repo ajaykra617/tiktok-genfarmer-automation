@@ -12,7 +12,8 @@ Configured locally through `GENFARMER_BASE_URL` in `.env`.
 - The Windows process listening on the configured GenFarmer port is `GenFarmer.exe`.
 - Observed product/file version: `2.6.1.0`.
 - The executable is installed under the user's Local Programs `GenFarmer` directory.
-- A read-only loose-text scan of that install root found no route-like strings.
+- GenFarmer is Electron-packaged and includes `resources/app.asar`.
+- A read-only packaged-resource scan discovered 69 route-like strings from `app.asar`.
 - The following common metadata/documentation paths returned HTTP `404` in the client lab:
   - `/health`
   - `/api/health`
@@ -28,23 +29,37 @@ Configured locally through `GENFARMER_BASE_URL` in `.env`.
   - `/api-docs`
   - `/api/docs`
 
-Conclusion: the local GenFarmer service is reachable, but it does not expose conventional Swagger/OpenAPI metadata at the common paths tested and its route definitions are not present in loose text files.
+## High-confidence route candidates from the packaged app
 
-## Known functional status
+The following strings appear relevant to GenFarmer itself and are being verified using GET-only requests before any mutation calls are implemented:
 
-- GenFarmer API connectivity has been confirmed in the client lab.
-- Fingerprint rotation has previously been tested successfully.
-- Exact device/project/fingerprint endpoint schemas still need to be captured.
+- `/api/devices`
+- `/devices`
+- `/devices/details`
+- `/devices/random`
+- `/device`
+- `/profile`
+- `/group`
+- `/instance`
+- `/automation`
+- `/automation/runs`
+- `/tasks`
+- `/apps`
+- `/apps/total`
+- `/api/update_proxy` — likely mutating; do not call until its method/schema is confirmed
+- `/v1/devices/assign` — likely mutating; do not call until confirmed
+- `/v1/devices/validate`
+- `/v1/resource/device`
+
+The packaged scan also found many dependency/API strings that may not belong to the local GenFarmer service, so route presence in `app.asar` is evidence for investigation, not proof that a localhost endpoint exists.
 
 ## Discovery strategy
 
 1. Read-only HTTP metadata probe (`scripts/genfarmer_discovery.py`).
-2. Read-only inspection of the Windows process listening on the configured GenFarmer port (`scripts/genfarmer_local_inspect.py`).
-3. Read-only packaged-application inventory/string scan (`scripts/genfarmer_package_inspect.py`) to detect Electron/Tauri resources and route-like strings in `app.asar` or embedded assets.
-4. Confirm candidate routes using GET/HEAD or observation of the GenFarmer UI before implementing mutations.
-5. Record every verified endpoint below with sanitized schemas/examples.
-
-The packaged-app inspector does not extract or modify GenFarmer files; it inventories and reads selected resources only, writing findings under the local ignored `evidence/` directory.
+2. Read-only Windows listener/process inspection (`scripts/genfarmer_local_inspect.py`).
+3. Read-only packaged application scan (`scripts/genfarmer_package_inspect.py`).
+4. GET-only verification of curated high-confidence routes (`scripts/genfarmer_route_probe.py`).
+5. Record verified endpoint schemas here before adding any mutation support.
 
 ## Discovery checklist
 
@@ -65,7 +80,11 @@ For every endpoint we confirm, record:
 | Method | Path | Purpose | Status |
 |---|---|---|---|
 | GET | `/` | Service/version landing response | Verified: GenFarmer 2.6.1 |
-| TBD | TBD | Device listing | To discover |
-| TBD | TBD | Device control | To discover |
-| TBD | TBD | Fingerprint/profile | Partially proven functionally; schema to discover |
-| TBD | TBD | Automation/project execution | To discover |
+| GET? | `/api/devices` | Candidate device listing | Route discovered; verification pending |
+| GET? | `/devices` | Candidate device listing/control surface | Route discovered; verification pending |
+| GET? | `/devices/details` | Candidate device details | Route discovered; verification pending |
+| GET? | `/automation/runs` | Candidate automation-run listing | Route discovered; verification pending |
+| GET? | `/tasks` | Candidate task listing | Route discovered; verification pending |
+| GET? | `/apps` | Candidate app/project listing | Route discovered; verification pending |
+| TBD | `/api/update_proxy` | Candidate proxy update endpoint | Do not call until mutation schema is confirmed |
+| TBD | TBD | Fingerprint/profile mutation | Functionally proven previously; exact endpoint/schema still to discover |

@@ -2,7 +2,7 @@
 
 ## Current milestone
 
-Move from proven single-device control into verified GenFarmer API integration.
+Integrate the documented GenFarmer Local API and prove the official contract against the installed 2.6.1 service.
 
 ## Completed
 
@@ -16,21 +16,31 @@ Move from proven single-device control into verified GenFarmer API integration.
 - [x] Capture local screenshots/UI hierarchy/result JSON for the smoke run.
 - [x] Confirm GenFarmer local service is reachable.
 - [x] Identify GenFarmer service version as 2.6.1 from `GET /`.
-- [x] Confirm common Swagger/OpenAPI/health/version metadata paths are not exposed.
 - [x] Identify the API listener process as `GenFarmer.exe` version `2.6.1.0`.
-- [x] Identify the local install root under the user's Local Programs directory.
-- [x] Confirm loose text assets do not expose route-like strings.
 - [x] Confirm GenFarmer is Electron-packaged and contains `resources/app.asar`.
-- [x] Discover 69 route-like candidates from the packaged application, including `/api/devices`, `/devices`, `/devices/details`, `/automation/runs`, `/tasks`, `/apps`, and `/api/update_proxy`.
-- [x] Add a GET-only route verifier for high-confidence local endpoints.
+- [x] Locate the official GenFarmer Local API documentation.
+- [x] Confirm the official API documents Automation Apps, Tasks, Runs and current-user endpoints.
+- [x] Add reusable `GenFarmerClient` based on the official API contract.
+- [x] Keep all mutation methods fail-closed unless explicitly enabled.
+- [x] Add a read-only official API compatibility smoke test.
 
 ## In progress
 
-- [ ] Verify which discovered route candidates are actually served by the local GenFarmer API.
-- [ ] Capture response schemas for device-list/read-only endpoints.
-- [ ] Map GenFarmer device IDs to local ADB devices.
-- [ ] Build the first reusable GenFarmer Python client.
-- [ ] Convert the safe smoke workflow from direct ADB orchestration to GenFarmer orchestration where supported.
+- [ ] Run `scripts/genfarmer_api_smoke.py` against GenFarmer 2.6.1.
+- [ ] Capture actual response shapes for current user, apps and runs.
+- [ ] Identify an existing Automation App suitable for our harmless first API-driven test.
+- [ ] Determine the supported device ID / serial mapping required by task assignment.
+- [ ] Map GenFarmer device identities to local ADB devices without committing client IPs publicly.
+- [ ] Execute one controlled harmless GenFarmer automation on Device #1.
+
+## Official-doc gaps to resolve
+
+- [ ] Generic device inventory endpoint is not clearly documented.
+- [ ] Fingerprint/change-device/profile API is not clearly documented.
+- [ ] Proxy update/assignment API is not clearly documented.
+- [ ] GET task-list endpoint is not clearly documented; the public page contains a mislabeled run-list cURL example.
+
+For these gaps only, use observation/read-only inspection and verify against GenFarmer 2.6.1 before adding support.
 
 ## External hardware dependency
 
@@ -40,8 +50,7 @@ Move from proven single-device control into verified GenFarmer API integration.
 
 ## Later
 
-- [ ] Build local 20-device mapping without committing client IPs publicly.
 - [ ] Add proxy-aware preflight/fail-closed behavior.
-- [ ] Build authorized application workflow.
+- [ ] Build authorized TikTok workflow.
 - [ ] Multi-device orchestration.
 - [ ] Scale production workflows only after single-device stability.

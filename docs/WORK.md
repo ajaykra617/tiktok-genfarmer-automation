@@ -2,32 +2,30 @@
 
 ## Current milestone
 
-Build a deterministic single-device automation foundation before scaling.
+Move from proven single-device control into verified GenFarmer API integration.
 
 ## Completed
 
 - [x] Establish project architecture and documentation.
-- [x] Confirm single-device ADB control in the client lab.
-- [x] Confirm GenFarmer API availability in the client lab.
-- [x] Confirm GenFarmer fingerprint rotation.
-- [x] Confirm XProxy service and first-position proxy listeners.
-- [x] Separate public source code from client-specific local configuration.
 - [x] Create canonical public GitHub repository.
 - [x] Clone repository onto client Windows PC.
-- [x] Confirm client Python runtime is available.
+- [x] Keep client-specific network/device values out of the public repository.
 - [x] Confirm 20 Android devices are simultaneously visible to ADB.
 - [x] Add live ADB inventory script.
-- [x] Add safe single-device Android Settings smoke test with local evidence capture.
-- [x] Run the first safe smoke test against selected Device #1: PASS.
-- [x] Verify Settings launch, UI hierarchy read, evidence capture, and return-to-Home behavior.
-- [x] Add read-only GenFarmer API discovery probe.
+- [x] Run safe Device #1 Android Settings smoke test successfully.
+- [x] Capture local screenshots/UI hierarchy/result JSON for the smoke run.
+- [x] Confirm GenFarmer local service is reachable.
+- [x] Identify GenFarmer service version as 2.6.1 from `GET /`.
+- [x] Confirm common Swagger/OpenAPI/health/version metadata paths are not exposed.
+- [x] Add read-only GenFarmer process/route discovery tooling.
 
 ## In progress
 
-- [ ] Run GenFarmer read-only API discovery on the client PC.
-- [ ] Capture confirmed endpoint inventory and schemas.
-- [ ] Investigate Android identity coherence: reported release and SDK values were inconsistent in the smoke result.
-- [ ] Convert smoke workflow to GenFarmer API orchestration.
+- [ ] Identify the Windows process/executable serving the GenFarmer API.
+- [ ] Discover route candidates from local GenFarmer assets without modifying them.
+- [ ] Map GenFarmer device IDs to local ADB devices.
+- [ ] Build the first reusable GenFarmer Python client.
+- [ ] Convert the safe smoke workflow from direct ADB orchestration to GenFarmer orchestration where supported.
 
 ## External hardware dependency
 
@@ -38,6 +36,7 @@ Build a deterministic single-device automation foundation before scaling.
 ## Later
 
 - [ ] Build local 20-device mapping without committing client IPs publicly.
-- [ ] Authorized application workflow.
+- [ ] Add proxy-aware preflight/fail-closed behavior.
+- [ ] Build authorized application workflow.
 - [ ] Multi-device orchestration.
 - [ ] Scale production workflows only after single-device stability.

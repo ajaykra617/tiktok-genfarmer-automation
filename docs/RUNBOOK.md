@@ -4,79 +4,89 @@
 
 `C:\genfarmer-lab\tiktok-genfarmer-automation`
 
-## Client Git model
+## Normal update cycle in VS Code
 
-The client PC does not need GitHub authentication for this public repository.
-Clone once, then update with:
+From the VS Code terminal:
 
-```bash
-cd /c/genfarmer-lab/tiktok-genfarmer-automation
+```powershell
 git pull --ff-only origin main
+git log -1 --oneline
 ```
 
-Do not repeatedly delete/re-clone the repository because local ignored configuration and evidence should remain in place.
+The client PC does not need GitHub authentication for clone/pull because the repository is public. Local-only files remain ignored by Git.
 
-## First-time local configuration
+## Local configuration
 
-1. Copy `.env.example` to `.env`.
-2. Copy `config/device-map.example.yaml` to `config/device-map.local.yaml`.
-3. Fill client-specific values locally.
-4. Never commit those local files.
+Create once:
 
-## Runtime discovery
+```powershell
+Copy-Item .env.example .env
+Copy-Item config\device-map.example.yaml config\device-map.local.yaml
+```
 
-List live devices plus basic Android information:
+Populate `.env` and `config/device-map.local.yaml` with client-specific values. Never commit those files.
 
-```bash
+## Device checks
+
+Inventory all attached Android devices:
+
+```powershell
 python scripts/device_inventory.py
 ```
 
-JSON output is also available:
+Run the safe single-device Settings smoke test:
 
-```bash
-python scripts/device_inventory.py --json
+```powershell
+python scripts/device_smoke.py --device <ADB_DEVICE_ID>
 ```
 
-## Safe single-device smoke test
+## GenFarmer discovery
 
-Choose exactly one ADB device from the inventory and run:
+First perform conventional GET-only metadata discovery:
 
-```bash
-python scripts/device_smoke.py --device DEVICE_IP:5555
+```powershell
+python scripts/genfarmer_discovery.py
 ```
 
-For launch/read-only verification without the optional Settings navigation tap:
+If no Swagger/OpenAPI documentation is exposed, inspect the local Windows listener and nearby application assets read-only:
 
-```bash
-python scripts/device_smoke.py --device DEVICE_IP:5555 --no-navigation
+```powershell
+python scripts/genfarmer_local_inspect.py
 ```
 
-The smoke test:
-- verifies ADB state;
-- reads basic device properties;
-- opens Android Settings;
-- captures screenshot and UI hierarchy evidence;
-- optionally performs one deliberately limited read-only navigation tap;
-- returns Home;
-- writes `result.json` under the ignored `evidence/` directory.
+The local-inspection script:
+
+- identifies the process bound to the configured GenFarmer port;
+- records executable/product/version metadata;
+- sanitizes credential-like command-line arguments;
+- lists candidate application roots/files;
+- scans only nearby non-secret text assets for route-like strings;
+- writes results under ignored `evidence/`;
+- modifies no GenFarmer files.
+
+To identify only the process without scanning assets:
+
+```powershell
+python scripts/genfarmer_local_inspect.py --no-scan
+```
 
 ## Start-of-session checks
 
-- Git checkout is current.
-- ADB device(s) reachable.
-- GenFarmer API reachable.
-- XProxy reachable when proxy is required.
-- Required mobile public IP is verified before proxy-required workflows.
+- Repository is up to date.
+- ADB target is reachable.
+- GenFarmer API is reachable.
+- XProxy is reachable when proxy is required.
+- A required mobile public IP is verified before proxy-required application workflows.
 
 ## Evidence
 
 Each run should record:
-- timestamp
-- logical device name
-- workflow name
-- success/failure
-- screenshots/UI dumps where useful
-- public IP when proxy is involved
-- sanitized error information
+
+- timestamp;
+- logical device/workflow;
+- success/failure;
+- screenshots/UI dumps where useful;
+- public IP when proxy is involved;
+- sanitized diagnostic information.
 
 Never commit account credentials or sensitive evidence.

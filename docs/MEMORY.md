@@ -9,23 +9,26 @@
 - Keep implementation, runbook, work log, and architecture synchronized.
 - Basic device automation can proceed while modem/SIM hardware is repaired.
 - Proxy-required application jobs fail closed unless a verified cellular public IP exists.
-- GenFarmer endpoint discovery must be read-only until endpoint semantics are confirmed.
+- Prefer observation and read-only discovery before guessing GenFarmer API routes.
 
 ## Verified milestones
 
-- 20 Android devices were simultaneously visible to ADB on the client workstation.
-- The selected Device #1 passed the safe Android Settings smoke test.
-- The smoke test verified app launch, UI hierarchy inspection, local evidence capture, and return to Home.
+- 20 Android devices were simultaneously visible to ADB in the client lab.
+- Device #1 completed the safe Settings smoke workflow successfully with local evidence capture.
+- Device #1 UI was readable through UiAutomator; the visible Settings UI was French-localized.
+- GenFarmer root endpoint identifies the local service as version 2.6.1.
+- Common health/version/Swagger/OpenAPI paths tested by the read-only discovery script returned 404.
 
-## Important observation
+## Device identity caution
 
-The selected device reported an internally inconsistent Android identity: release `10` while SDK reported `35`. This may be related to fingerprint/property manipulation and must be investigated before relying on build identity for application workflows.
+Several devices report an Android release value that does not naturally match SDK 35 (for example Android 10 with SDK 35). Because fingerprint/profile manipulation is part of the GenFarmer environment, do not treat individual `getprop` identity fields as authoritative until we compare raw/system identity with the active GenFarmer profile.
 
 ## Remaining work
 
-- Complete GenFarmer API inventory.
-- Review Android identity coherence and decide which properties are authoritative.
-- Convert orchestration to GenFarmer API.
+- Discover the GenFarmer listener process and local route surface.
+- Complete GenFarmer endpoint inventory.
+- Map GenFarmer device identifiers to ADB devices.
+- Implement reusable GenFarmer client/orchestration.
 - Verify XProxy cellular egress and rotation.
 - Build authorized application workflow.
-- Scale to the full device farm.
+- Scale to the full device farm only after the single-device lane is stable.

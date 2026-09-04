@@ -29,21 +29,27 @@ Learn the GenFarmer 2.6.1 `script.flow` language exhaustively enough to create a
 - [x] Add read-only `app.asar` palette/action scanners.
 - [x] Classify the first broad static palette scan as noisy/insufficient for action discovery.
 - [x] Run the strict V2 package scan: only 3 raw action-syntax matches, zero verified live actions recovered, zero package-only candidates.
-- [x] Conclude static `app.asar` token scanning is not a reliable way to enumerate the GenFarmer node palette in this build.
 - [x] Add a versioned GenFarmer 2.6.1 semantic action registry for the seven observed actions.
 - [x] Run privacy-safe routing analysis against the private exact-flow corpus.
 - [x] Prove all 3 observed non-null `data.successNode` pointers match an outgoing edge target.
 - [x] Confirm no non-null `data.failNode` route exists yet in the current sample, so failure routing remains unproven.
 - [x] Confirm official GitBook API page publishes a downloadable `GenFarmer.postman_collection.json` collection.
-- [x] Add offline privacy-safe Postman collection analyzer to compare the official collection against the public GitBook endpoint baseline and detect any `script.flow` examples.
+- [x] Add offline privacy-safe Postman collection analyzer.
+- [x] Attempt Chromium remote debugging and confirm GenFarmer rejects `--remote-debugging-port` with its own `Invalid args. Exiting...` handling.
+- [x] Add a structured ASAR source probe that reads the Electron archive as files instead of one opaque 248 MB byte stream.
+- [x] Scan 16,170 text-bearing ASAR files and recover all 13 known Automation palette labels.
+- [x] Identify `dist/render/assets/useScriptEditor-HioTuYH4.js` as the strongest Automation editor bundle: it contains all 13 known palette anchors in one file.
+- [x] Add focused `genfarmer_node_registry_probe.py` to mine that bundle for likely node label/action/type/category associations and runtime option keys without emitting raw proprietary source.
 
 ## In progress
 
+- [ ] Run `scripts/genfarmer_node_registry_probe.py` against `dist/render/assets/useScriptEditor-HioTuYH4.js`.
+- [ ] Determine whether the bundle exposes the complete sidebar node registry in one pass.
+- [ ] Pair palette labels with internal `data.action`/type/category identifiers where source evidence supports it.
+- [ ] Recover generic per-node configuration-key sets from the editor bundle and compare them with live `script.flow` templates.
 - [ ] Download the official `GenFarmer.postman_collection.json` to ignored local evidence and run `scripts/genfarmer_postman_analyze.py`.
 - [ ] Compare collection endpoints/request schemas against the public GitBook baseline and our Python client.
-- [ ] Check whether the official collection contains real `script.flow` node examples or only empty `nodes`/`edges` examples.
-- [ ] Create `GF Lab - Node Catalog` in the GenFarmer UI for full live palette coverage.
-- [ ] Add every still-unobserved visible node-palette item once using harmless synthetic configuration.
+- [ ] Create `GF Lab - Node Catalog` only for nodes/settings that remain unverified after source-registry mining.
 - [ ] Run structural + semantic + routing learners against the Node Catalog app.
 - [ ] Populate the local template registry from the private exact-flow corpus.
 - [ ] Learn failure routing with one harmless failure edge.

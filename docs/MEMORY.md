@@ -9,8 +9,9 @@
 - Keep implementation, runbook, work log, and architecture synchronized.
 - Basic device automation can proceed while modem/SIM hardware is repaired.
 - Proxy-required application jobs fail closed unless a verified cellular public IP exists.
-- Prefer observation and read-only discovery before guessing GenFarmer API routes.
-- When loose application files do not expose routes, inspect packaged resources read-only before attempting active endpoint discovery.
+- The official GenFarmer API documentation is the primary contract for supported Local API calls.
+- Packaged-app route discovery is retained only as a fallback for gaps not covered by official documentation.
+- All GenFarmer POST/PUT/DELETE methods in our Python client are fail-closed by default and require explicit mutation opt-in.
 
 ## Verified milestones
 
@@ -18,10 +19,27 @@
 - Device #1 completed the safe Settings smoke workflow successfully with local evidence capture.
 - Device #1 UI was readable through UiAutomator; the visible Settings UI was French-localized.
 - GenFarmer root endpoint identifies the local service as version 2.6.1.
-- Common health/version/Swagger/OpenAPI paths tested by the read-only discovery script returned 404.
 - The process listening on the GenFarmer API port is `GenFarmer.exe`, product version `2.6.1.0`.
-- The executable is installed in the user's Local Programs GenFarmer directory.
-- The initial loose-text scan covered three nearby text files and found zero route-like strings.
+- GenFarmer is Electron-packaged and includes `resources/app.asar`.
+- The public GenFarmer API documentation provides Local API examples using `127.0.0.1:55554` and documents Automation Apps, Tasks, Runs and current-user operations.
+- A reusable official-API client and read-only compatibility smoke script now exist in the repository.
+
+## Official API coverage
+
+Documented read operations include:
+
+- current user;
+- list/get Automation Apps;
+- list Automation Runs;
+- retrieve run storage/output.
+
+Documented mutation operations include:
+
+- create/update/delete apps/tasks/runs where applicable;
+- assign/remove devices on tasks;
+- execute an Automation Run.
+
+The public API page does not clearly document a generic device inventory API, direct fingerprint/change-device API, proxy update API, or a reliable GET task-list endpoint. These remain controlled discovery items.
 
 ## Device identity caution
 
@@ -29,11 +47,11 @@ Several devices report an Android release value that does not naturally match SD
 
 ## Remaining work
 
-- Determine whether the GenFarmer desktop package is Electron, Tauri, or another layout.
-- Inspect packaged resources such as `app.asar`/embedded assets for route candidates without modifying them.
-- Complete GenFarmer endpoint inventory.
-- Map GenFarmer device identifiers to ADB devices.
-- Implement reusable GenFarmer client/orchestration.
+- Run the official read-only API smoke against the installed 2.6.1 service.
+- Capture actual response schemas and existing app/run IDs.
+- Resolve GenFarmer device ID and serial mapping for Device #1.
+- Execute one harmless authorized GenFarmer automation through the documented API.
+- Resolve undocumented fingerprint and proxy integration surfaces only as needed.
 - Verify XProxy cellular egress and rotation.
-- Build authorized application workflow.
+- Build the authorized TikTok workflow.
 - Scale to the full device farm only after the single-device lane is stable.

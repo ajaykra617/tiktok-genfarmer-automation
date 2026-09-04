@@ -1,28 +1,32 @@
 {
   "project": "TikTok Automation / GenFarmer",
   "visibility": "public-source-private-client-config",
-  "phase": "genfarmer-api-discovery",
+  "phase": "official-genfarmer-api-integration",
   "verified_capabilities": [
     "20 Android devices visible simultaneously to ADB",
     "safe Device #1 Settings smoke workflow passed with local evidence",
     "GenFarmer API reachable",
     "GenFarmer root identifies version 2.6.1",
+    "GenFarmer listener identified as GenFarmer.exe 2.6.1.0",
+    "official GenFarmer Local API documentation located",
+    "reusable documented-API Python client implemented with fail-closed mutations",
     "GenFarmer fingerprint rotation previously proven",
     "XProxy service reachable",
     "first-position proxy listeners available"
   ],
   "current_findings": [
-    "common GenFarmer health/version/Swagger/OpenAPI metadata paths returned 404",
+    "official docs cover current user plus Automation Apps, Tasks and Runs",
+    "official docs do not clearly expose generic device inventory, fingerprint/profile, proxy update, or reliable GET task-list APIs",
     "some Android identity properties are inconsistent with SDK 35 and require profile-vs-system comparison"
   ],
   "blockers": [
     "first cellular modem/SIM does not yet expose a verified mobile public IP"
   ],
   "next": [
-    "inspect the Windows process serving GenFarmer",
-    "discover GenFarmer route candidates read-only",
-    "map GenFarmer device IDs to ADB devices",
-    "build reusable GenFarmer Python client",
-    "convert safe smoke workflow to GenFarmer orchestration"
+    "run official documented GET-only API smoke against GenFarmer 2.6.1",
+    "capture actual current-user/app/run response schemas",
+    "resolve GenFarmer device ID and serial mapping for Device #1",
+    "execute one harmless authorized GenFarmer automation via documented API",
+    "resolve undocumented fingerprint/proxy surfaces only as needed"
   ]
 }

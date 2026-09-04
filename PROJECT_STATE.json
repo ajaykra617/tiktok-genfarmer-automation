@@ -18,9 +18,8 @@
     "privacy-safe script.flow routing analyzer implemented",
     "structured Electron app.asar source inspection implemented",
     "Automation editor bundle identified and palette-source mining implemented",
-    "37 action* tokens discovered from the Automation editor bundle",
-    "per-action settings/options source probes v1 and v2 executed",
-    "AST-based JavaScript registry/action-usage probe implemented",
+    "AST-based JavaScript registry/action-usage probe executed across 18 renderer assets",
+    "AST palette label/action/icon registry extractor implemented",
     "GenFarmer fingerprint rotation previously proven",
     "XProxy service reachable",
     "first-position proxy listeners available"
@@ -43,24 +42,23 @@
     "dist/render/assets/useScriptEditor-HioTuYH4.js contains all original known palette labels and is the primary Automation editor source bundle",
     "the editor bundle has no source map",
     "source mining discovered additional likely palette labels including Uninstall App, Is installed App, Clear App Data, Transfer File, Device actions, Toggle service, Check activity, Press key, Type text, Update field, Get property, Element exists, Multi Element exists, Get attribute, Write file, Save assets, Set variable, Insert data, Open AI and Case Path",
-    "37 action* tokens are source-discovered, including actionElementExists, actionVariables, actionLoop, actionTypeText, actionHttp, actionSwipe, actionImageSearch, actionSpreadsheet and actionClipboard",
-    "proximity-based action-label correlation is strong for several obvious pairs but remains source evidence, not exact script.flow serialization proof",
-    "settings probe v1 was too broad because nearly every action inherited shared HTTP/Loop/Variables labels, file/folder/password keys and generic form controls",
-    "settings probe v2 is also insufficient for most actions: useScriptEditor contains all 37 action tokens and tight regex windows still leak minified neighboring code; only a few one-action chunks such as ModalNode provide action-specific structure",
-    "therefore the next source step uses a real JavaScript AST to distinguish action* identifiers from string/i18n keys and inspect the smallest syntactic object/call contexts instead of textual proximity",
-    "generic form controls such as Input, Select, Switch, Slider, TextArea and Grid are settings UI primitives and must not be counted as Automation nodes",
-    "verified node creation must still clone exact local templates rather than fabricate undocumented payloads"
+    "AST analysis classified 63 action* tokens across 18 renderer assets",
+    "several action* tokens previously treated as possible internal actions are actually used as icon values in palette-shaped objects; examples include actionPressBack, actionPressHome, actionPressMenu, actionScreenshot, actionTypeText and actionMouseMove",
+    "therefore action* tokens must not be promoted as serialized data.action values",
+    "stronger palette action constants visible in the same AST contexts include PRESS_BACK, PRESS_HOME, PRESS_MENU, PRESS, TYPE_TEXT, TOUCH, SWIPE, SCREENSHOT, CHANGE_DEVICE, START_APP, STOP_APP, INSTALL_APP, UNINSTALL_APP, ADB, CHECK_NETWORK, BACKUP_RESTORE_V2, GEN_ROUTER and CMD",
+    "the next source step is exact AST extraction of object rows that directly contain label, action and icon properties",
+    "verified node creation must still clone exact local script.flow templates rather than fabricate undocumented payloads"
   ],
   "blockers": [
-    "full source-discovered action catalog has not yet been mapped to trustworthy per-action settings and exact saved script.flow templates",
+    "full source-derived palette action constants have not yet been cross-mapped to exact saved script.flow data.action values and settings",
     "first cellular modem/SIM does not yet expose a verified mobile public IP"
   ],
   "next": [
-    "run scripts/genfarmer_ast_registry_probe.py after installing updated dev dependencies",
-    "classify whether action* tokens are runtime identifiers, localization keys, object keys or call arguments",
-    "recover smallest AST object/call contexts that pair labels, semantic literals and option keys",
-    "build a confidence-ranked source-derived action-to-label catalog",
-    "create GF Lab - Node Catalog only for actions still lacking exact GenFarmer-generated templates",
+    "run scripts/genfarmer_palette_registry_ast.py",
+    "build the first exact source-derived label -> action constant -> icon table",
+    "cross-check source action constants against live saved script.flow data.action values",
+    "use exact registry rows as anchors for settings-schema extraction",
+    "create GF Lab - Node Catalog only for nodes still lacking exact GenFarmer-generated templates",
     "learn ambiguous settings with one-field-at-a-time private snapshots and masked diffs",
     "promote verified nodes into the GenFarmer 2.6.1 Python authoring registry",
     "prove a harmless Python-authored flow on Device #1"

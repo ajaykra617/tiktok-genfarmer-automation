@@ -20,6 +20,7 @@
     "Automation editor bundle identified and palette-source mining implemented",
     "37 internal action* identifiers discovered from the Automation editor bundle",
     "per-action settings/options source probe implemented",
+    "scoped differential per-action settings probe v2 implemented",
     "GenFarmer fingerprint rotation previously proven",
     "XProxy service reachable",
     "first-position proxy listeners available"
@@ -44,15 +45,17 @@
     "source mining discovered additional likely palette labels including Uninstall App, Is installed App, Clear App Data, Transfer File, Device actions, Toggle service, Check activity, Press key, Type text, Update field, Get property, Element exists, Multi Element exists, Get attribute, Write file, Save assets, Set variable, Insert data, Open AI and Case Path",
     "37 internal action identifiers are now source-discovered, including actionElementExists, actionVariables, actionLoop, actionTypeText, actionHttp, actionSwipe, actionImageSearch, actionSpreadsheet and actionClipboard",
     "action-label correlation is strong for several obvious pairs such as actionPressBack/Press Back, actionPressHome/Press Home, actionPressMenu/Press Menu, actionPause/Sleep, actionScreenshot/Screenshot, actionVariables/Variables and actionTypeText/Type text",
+    "the first per-action settings probe is intentionally classified as noisy because nearly every action inherited the same HTTP/Loop/Variables labels, file/folder/password keys and generic form controls from shared editor infrastructure",
+    "settings/options must therefore be inferred from tight exact-action windows in the smallest least-shared renderer assets and from keys/controls that are distinctive across actions",
     "generic form controls such as Input, Select, Switch, Slider, TextArea and Grid are settings UI primitives and must not be counted as Automation nodes",
     "verified node creation must still clone exact local templates rather than fabricate undocumented payloads"
   ],
   "blockers": [
-    "full source-discovered action catalog has not yet been mapped to per-action settings and exact saved script.flow templates",
+    "full source-discovered action catalog has not yet been mapped to trustworthy per-action settings and exact saved script.flow templates",
     "first cellular modem/SIM does not yet expose a verified mobile public IP"
   ],
   "next": [
-    "run per-action settings/options probe across renderer assets",
+    "run scripts/genfarmer_action_settings_v2.py for scoped differential action settings",
     "build a confidence-ranked source-derived action-to-label-to-settings catalog",
     "create GF Lab - Node Catalog only for actions still lacking exact GenFarmer-generated templates",
     "learn ambiguous settings with one-field-at-a-time private snapshots and masked diffs",

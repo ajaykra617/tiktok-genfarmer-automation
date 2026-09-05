@@ -8,7 +8,7 @@ Evidence levels used here:
 - ``unique-source``: one unambiguous literal was structurally resolved for the
   palette action constant;
 - ``live-flow-anchor``: exact ``data.action`` was independently observed in a
-  saved GenFarmer flow;
+  saved GenFarmer flow, including the dedicated lab catalog flow;
 - ``unresolved``: source evidence was ambiguous and no guess is made.
 """
 from __future__ import annotations
@@ -47,7 +47,7 @@ PALETTE_261: tuple[PaletteAction261, ...] = (
     PaletteAction261("Get property", "H.GET_PROPERTY", "GetProperty", "unique-source"),
     PaletteAction261("Grok", "H.GROK", "Grok", "unique-source"),
     PaletteAction261("Group Node", "Ht.GROUP_NODE", "GroupNode", "unique-source"),
-    PaletteAction261("HTTP", "H.HTTP", None, "unresolved"),
+    PaletteAction261("HTTP", "H.HTTP", "HTTP", "live-flow-anchor"),
     PaletteAction261("If", "H.IF", "If", "unique-source"),
     PaletteAction261("Image search", "H.IMAGE", "Image", "unique-source"),
     PaletteAction261("IMAP (Read mail)", "H.IMAP", "Imap", "unique-source"),

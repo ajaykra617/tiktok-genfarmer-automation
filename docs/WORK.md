@@ -17,71 +17,57 @@ Learn the GenFarmer 2.6.1 `script.flow` language exhaustively enough to create a
 - [x] Add reusable `GenFarmerClient` based on the documented API.
 - [x] Keep all mutation methods fail-closed unless explicitly enabled.
 - [x] Add lossless `script.flow` reader/editor and round-trip tests.
-- [x] Run first read-only `script.flow` corpus pass.
-- [x] First corpus: 1 app, 7 nodes, 3 edges, 4 broad Vue Flow families.
-- [x] Prove `type=custom` is a rendering family rather than a unique automation action.
-- [x] Run semantic learner and identify seven real serialized semantic actions: `Start`, `Variables`, `ContextMenu`, `Adb`, `DeepSeek`, `Pause`, `Screenshot`.
-- [x] Record `Pause.timeoutType=fixed` as an observed enum value.
-- [x] Record success-edge handle patterns and prove all observed non-null `successNode` pointers match outgoing edge targets.
-- [x] Add privacy-safe semantic catalog, snapshots, masked differential tooling and local-only node template registry.
-- [x] Confirm official GitBook API page publishes a downloadable `GenFarmer.postman_collection.json` collection and add an offline analyzer.
-- [x] Attempt Chromium remote debugging and confirm GenFarmer rejects `--remote-debugging-port` with its own argument parser.
-- [x] Add structured ASAR source inspection and scan 16,170 text-bearing files.
-- [x] Identify `dist/render/assets/useScriptEditor-HioTuYH4.js` as the primary Automation editor source bundle and confirm it has no source map.
-- [x] Separate settings-form controls (`Input`, `Select`, `Switch`, `Slider`, `TextArea`, `Grid`, etc.) from Automation node candidates.
-- [x] Run regex/proximity settings probes v1/v2 and classify them as too noisy for trustworthy per-node settings attribution.
-- [x] Add AST-based JavaScript probes and prove many `action*` tokens are icon values, not serialized actions.
-- [x] Add exact AST `label` + `action` + `icon` palette extraction.
-- [x] Expand exact source-derived palette coverage to 60 direct registry rows, including Clipboard, Cmd, Comment, Gemini, GenRouter, Grok, HTTP, If, Javascript, Log, Loop, Random, Reconnect, Spreadsheet, Stop, Swipe/Scroll, Touch and Xpath.
-- [x] Run fail-closed action constant resolver V2 across 199 renderer assets.
-- [x] Resolve 56/60 palette actions with explicit provenance: 55 `unique-source` plus live `Screenshot` anchor.
-- [x] Validate all four live-known resolver anchors: `ADB -> Adb`, `DEEPSEEK -> DeepSeek`, `PAUSE -> Pause`, `SCREENSHOT -> Screenshot`.
-- [x] Keep ambiguous `HTTP`, `LOG`, `RANDOM`, and `STOP` unresolved; V2 correctly rejected conflicting candidate literals and accepted no canonical map.
-- [x] Run `genfarmer_node_factory_ast.py` across 199 renderer assets.
-- [x] Confirm source factory/default mining produced `0/60` usable candidates at score >=20; only sparse switch evidence exists for Case Path, Comment, Loop, Multi Element exists and Stop.
-- [x] Adopt stopping rule: do not spend more time broad-mining minified renderer code for default node payloads unless a new high-confidence source path appears.
-- [x] Add versioned `palette_catalog_261.py` containing all 60 source-proven rows and a GET-only lab coverage auditor.
-- [x] Create/use the dedicated `GF Lab - Node Catalog` app and run the first live audit.
-- [x] Resolve the first source-ambiguous action from exact saved flow evidence: `H.HTTP -> data.action HTTP`.
-- [x] Promote HTTP to `live-flow-anchor`; catalog status is now 57/60 resolved and 3 unresolved.
+- [x] Run first structural/semantic/routing corpus passes and identify the original seven live semantic actions.
+- [x] Add privacy-safe semantic catalogs, snapshots, masked differential tooling and local-only node template registry.
+- [x] Identify the Automation editor renderer bundle and recover the exact source palette registry with AST tooling.
+- [x] Recover 60 exact `label + action + icon` palette rows.
+- [x] Resolve source action literals with fail-closed provenance and stop source-side default mining after it yielded `0/60` usable factory/default candidates.
+- [x] Add versioned `palette_catalog_261.py` and GET-only live catalog auditor.
+- [x] Create/populate `GF Lab - Node Catalog` with every available palette node.
+- [x] Full lab audit: 62 nodes, 0 edges, 56/57 then-current resolved actions captured; only Group Node was absent from `data.action` coverage.
+- [x] Resolve all four previously ambiguous source constants from exact saved lab evidence: `H.HTTP -> HTTP`, `H.LOG -> Log`, `H.RANDOM -> Random`, `H.STOP -> Stop`.
+- [x] Palette catalog is now 60/60 resolved actions with explicit source/live provenance.
+- [x] Add `genfarmer_lab_template_capture.py` to save the exact lab flow privately and emit a shareable per-node structural/options inventory, including nodes without `data.action`.
 
 ## In progress
 
-- [ ] Resolve the remaining source-ambiguous actions one at a time from live lab nodes: `Log`, `Random`, `Stop`.
-- [ ] Add source-proven palette nodes to the lab app in manageable batches, save, and run `scripts/genfarmer_lab_catalog_audit.py` after each batch.
-- [ ] Capture exact GenFarmer-generated `script.flow` templates for all 60 palette actions without fabricating payloads.
-- [ ] Run structural + semantic + routing learners against the lab app as coverage grows.
-- [ ] Populate the local-only template registry from exact private raw-flow evidence.
-- [ ] Learn one harmless failure route and every ambiguous option with one-field-at-a-time snapshots/diffs.
+- [ ] Run `python -m pytest tests/test_palette_catalog_261.py` after pulling the 60/60 catalog update.
+- [ ] Run `scripts/genfarmer_lab_template_capture.py` against the completed lab app.
+- [ ] Identify `Group Node` from the no-`data.action` structural fingerprint and distinguish it from Start/Variables/Context Menu helpers.
+- [ ] Load the private exact 62-node lab flow into the local-only `TemplateRegistry` and inventory every distinct node template/variant.
+- [ ] Rank actions requiring one-field-at-a-time setting diffs; default shapes alone do not prove every selector/mode/enum.
+- [ ] Create a separate tiny routing lab for success/failure/branch edges so the full catalog corpus remains unconnected and stable.
+- [ ] Run structural + semantic learners against the completed lab app and compare with the versioned catalog.
 - [ ] Download the official `GenFarmer.postman_collection.json` to ignored local evidence and run `scripts/genfarmer_postman_analyze.py`.
-- [ ] Prove exact round-trip equality for the lab app.
+- [ ] Prove exact round-trip equality for the completed lab app.
 - [ ] Perform one harmless Python-generated edit and verify GenFarmer UI reloads it correctly.
 - [ ] Generate a harmless flow from verified templates and execute it on Device #1.
 
 ## Current evidence levels
 
 - **Live-verified serialization:** exact node exists in a saved GenFarmer `script.flow`.
-- **AST palette-registry row:** renderer object directly contains `label`, `action` and `icon` properties; strong source evidence for palette membership/action constant.
-- **Source-resolved literal:** source action constant is mapped to exactly one string literal by structural evidence.
-- **Live-flow anchor:** exact saved `script.flow` resolves an otherwise source-ambiguous constant.
-- **Lab-captured template:** exact GenFarmer-generated node object exists in the dedicated lab flow and can be loaded into the private template registry.
-- **Ambiguous token:** useful lead only; not promoted to the authoring registry.
+- **AST palette-registry row:** renderer object directly contains `label`, `action` and `icon` properties.
+- **Source-resolved literal:** source action constant maps unambiguously to a literal.
+- **Live-flow anchor:** saved lab flow resolves a source-ambiguous action literal.
+- **Lab-captured template:** exact GenFarmer-generated node object exists in the private lab flow and can be cloned by the private template registry.
+- **Differentially verified setting:** one UI setting was changed in isolation and the before/after flow diff proves its serialized field/value semantics.
 
 ## Specific semantics still to learn
 
-- [ ] app launch/stop/install/uninstall/data-clear actions;
+- [ ] identify Group Node's exact structural serialization;
+- [ ] app launch/stop/install/uninstall/data-clear option/default behavior;
 - [ ] tap/touch selector modes;
 - [ ] text/resource-id/XPathLite/class/coordinates selectors;
-- [ ] random/range wait semantics;
-- [ ] swipe/scroll/gesture nodes;
+- [ ] random/range semantics;
+- [ ] swipe/scroll/gesture modes;
 - [ ] input/type/clipboard nodes;
 - [ ] variables/input/output/storage details;
-- [ ] conditions/branches/case-path handle semantics;
+- [ ] conditions/branches/case-path handles;
 - [ ] loops/retry/failure paths;
-- [ ] file/spreadsheet/HTTP/IMAP/AI nodes;
+- [ ] file/spreadsheet/HTTP/IMAP/AI options;
 - [ ] screenshot/image-search/asset-storage behavior;
 - [ ] network/device/system nodes;
-- [ ] defaults, required fields, optional fields and enum values for every action.
+- [ ] required fields, optional fields and enum values for every action.
 
 ## External hardware dependency
 

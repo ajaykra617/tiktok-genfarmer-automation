@@ -1,13 +1,10 @@
 #!/usr/bin/env python3
-"""Audit live GenFarmer lab-flow coverage against the 2.6.1 palette catalog.
+"""Audit live GF Lab coverage against the GenFarmer 2.6.1 source catalog.
 
-This is the pivot from renderer-source discovery to exact saved-template learning.
-The script is GET-only.  It reads a dedicated lab Automation App (default name
-``GF Lab - Node Catalog``), extracts privacy-safe ``data.action`` and field/type
-shapes, and compares them with the 60 source-proven palette rows.
-
-Raw node IDs, user-entered labels/text/selectors/commands and app-specific scalar
-values are never written to the shareable report.
+GET-only. Privacy-safe: raw node IDs and user-entered values are omitted.
+The 60-row renderer registry contains 59 standalone action-node rows plus one
+editor-structural row (Group Node). Group Node is therefore reported separately
+and is not expected to appear as ``data.action=GroupNode``.
 """
 from __future__ import annotations
 
@@ -29,6 +26,8 @@ if str(SRC) not in sys.path:
 from genfarmer_automation.flow import FlowDocument, find_flow  # noqa: E402
 from genfarmer_automation.genfarmer_client import GenFarmerClient, GenFarmerError  # noqa: E402
 from genfarmer_automation.palette_catalog_261 import (  # noqa: E402
+    EDITOR_STRUCTURAL_ROWS_261,
+    LIVE_NODE_ACTIONS_261,
     PALETTE_261,
     RESOLVED_ACTIONS_261,
     SPECIAL_LIVE_NODES_261,
@@ -93,6 +92,25 @@ def extract_app_records(value: Any) -> list[dict[str, Any]]:
     return out
 
 
+def select_app(client: GenFarmerClient, user_id: str | int | None, app_id: str | None, app_name: str) -> tuple[Any, str]:
+    if app_id:
+        return client.get_app(app_id), "app-id"
+    matches: dict[str, dict[str, Any]] = {}
+    for page in range(1, 21):
+        payload = client.list_apps(user_id=user_id, page=page, limit=100)
+        records = extract_app_records(payload)
+        for record in records:
+            if record.get("name") == app_name:
+                matches[str(record["id"])] = record
+        if not records or len(records) < 100:
+            break
+    if not matches:
+        raise GenFarmerError(f"lab app not found by exact name {app_name!r}")
+    if len(matches) != 1:
+        raise GenFarmerError(f"found {len(matches)} apps named {app_name!r}; pass --app-id")
+    return client.get_app(next(iter(matches))), "exact-name"
+
+
 def value_type(value: Any) -> str:
     if value is None:
         return "null"
@@ -116,67 +134,19 @@ def safe_action(node: Mapping[str, Any]) -> str | None:
     if not isinstance(data, Mapping):
         return None
     value = data.get("action")
-    if isinstance(value, str) and SAFE_TOKEN_RE.fullmatch(value):
-        return value
-    return None
+    return value if isinstance(value, str) and SAFE_TOKEN_RE.fullmatch(value) else None
 
 
-def option_shape(node: Mapping[str, Any]) -> tuple[dict[str, str], dict[str, Any]]:
-    data = node.get("data")
-    if not isinstance(data, Mapping):
-        return {}, {}
-    options = data.get("options")
-    if not isinstance(options, Mapping):
-        return {}, {}
-    shape = {str(k): value_type(v) for k, v in sorted(options.items(), key=lambda kv: str(kv[0]))}
-    safe_values: dict[str, Any] = {}
-    for key in SAFE_OPTION_VALUE_KEYS:
-        value = options.get(key)
-        if value is None or isinstance(value, (bool, int, float)):
-            if key in options:
-                safe_values[key] = value
-        elif isinstance(value, str) and SAFE_TOKEN_RE.fullmatch(value):
-            safe_values[key] = value
-    return shape, safe_values
-
-
-def data_shape(node: Mapping[str, Any]) -> dict[str, str]:
-    data = node.get("data")
-    if not isinstance(data, Mapping):
+def shape(value: Any) -> dict[str, str]:
+    if not isinstance(value, Mapping):
         return {}
-    return {str(k): value_type(v) for k, v in sorted(data.items(), key=lambda kv: str(kv[0]))}
-
-
-def select_app(client: GenFarmerClient, user_id: str | int | None, app_id: str | None, app_name: str) -> tuple[Any, str]:
-    if app_id:
-        return client.get_app(app_id), "app-id"
-
-    matches: list[dict[str, Any]] = []
-    for page in range(1, 21):
-        payload = client.list_apps(user_id=user_id, page=page, limit=100)
-        records = extract_app_records(payload)
-        matches.extend(r for r in records if r.get("name") == app_name)
-        if not records or len(records) < 100:
-            break
-    # Deduplicate IDs in case nested response structures repeated a record.
-    unique = {str(r["id"]): r for r in matches}
-    if not unique:
-        raise GenFarmerError(
-            f'lab app not found by exact name {app_name!r}; create it in GenFarmer or pass --app-id'
-        )
-    if len(unique) != 1:
-        raise GenFarmerError(
-            f'found {len(unique)} apps named {app_name!r}; pass --app-id to select one explicitly'
-        )
-    selected_id = next(iter(unique))
-    return client.get_app(selected_id), "exact-name"
+    return {str(k): value_type(v) for k, v in sorted(value.items(), key=lambda kv: str(kv[0]))}
 
 
 def main() -> int:
     ap = argparse.ArgumentParser(description="GET-only coverage audit for GF Lab - Node Catalog")
-    ap.add_argument("--app-id", help="Explicit lab Automation App ID")
+    ap.add_argument("--app-id")
     ap.add_argument("--app-name", default="GF Lab - Node Catalog")
-    ap.add_argument("--batch-size", type=int, default=15, help="Print this many next-missing labels")
     args = ap.parse_args()
 
     load_dotenv(ROOT / ".env")
@@ -201,60 +171,43 @@ def main() -> int:
     families: dict[str, Counter[str]] = defaultdict(Counter)
     option_shapes: dict[str, Counter[str]] = defaultdict(Counter)
     data_shapes: dict[str, Counter[str]] = defaultdict(Counter)
-    safe_option_values: dict[str, dict[str, Counter[str]]] = defaultdict(lambda: defaultdict(Counter))
-    nodes_without_safe_action = 0
+    safe_values: dict[str, dict[str, Counter[str]]] = defaultdict(lambda: defaultdict(Counter))
 
     for node in doc.nodes:
         if not isinstance(node, Mapping):
             continue
         action = safe_action(node)
         if not action:
-            nodes_without_safe_action += 1
             continue
         observed_counts[action] += 1
         family = node.get("type")
-        family_token = str(family) if isinstance(family, (str, int)) and SAFE_TOKEN_RE.fullmatch(str(family)) else "<unknown>"
-        families[action][family_token] += 1
-        opts, safe_values = option_shape(node)
-        option_shapes[action][json.dumps(opts, sort_keys=True, separators=(",", ":"))] += 1
-        data_shapes[action][json.dumps(data_shape(node), sort_keys=True, separators=(",", ":"))] += 1
-        for key, value in safe_values.items():
-            safe_option_values[action][key][json.dumps(value, sort_keys=True)] += 1
+        families[action][str(family) if isinstance(family, (str, int)) else "<unknown>"] += 1
+        data = node.get("data") if isinstance(node.get("data"), Mapping) else {}
+        options = data.get("options") if isinstance(data.get("options"), Mapping) else {}
+        data_shapes[action][json.dumps(shape(data), sort_keys=True, separators=(",", ":"))] += 1
+        option_shapes[action][json.dumps(shape(options), sort_keys=True, separators=(",", ":"))] += 1
+        for key in SAFE_OPTION_VALUE_KEYS:
+            if key not in options:
+                continue
+            value = options[key]
+            if value is None or isinstance(value, (bool, int, float)) or (
+                isinstance(value, str) and SAFE_TOKEN_RE.fullmatch(value)
+            ):
+                safe_values[action][key][json.dumps(value, sort_keys=True)] += 1
 
     observed = set(observed_counts)
-    expected = set(RESOLVED_ACTIONS_261)
+    expected = set(LIVE_NODE_ACTIONS_261)
     specials = set(SPECIAL_LIVE_NODES_261)
     captured = expected & observed
     missing = expected - observed
     unexpected = observed - expected - specials
-
-    missing_rows = []
-    for item in PALETTE_261:
-        if item.action and item.action in missing:
-            missing_rows.append({
-                "label": item.label,
-                "constant": item.constant,
-                "action": item.action,
-                "provenance": item.provenance,
-            })
-
-    captured_rows = []
-    for action in sorted(captured):
-        item = by_action(action)
-        if item:
-            captured_rows.append({
-                "label": item.label,
-                "constant": item.constant,
-                "action": action,
-                "count": observed_counts[action],
-            })
 
     semantic_shapes = []
     for action in sorted(observed_counts):
         item = by_action(action)
         semantic_shapes.append({
             "action": action,
-            "palette_label": item.label if item else None,
+            "palette_label": item.label if item and item.role == "action-node" else None,
             "count": observed_counts[action],
             "families": dict(sorted(families[action].items())),
             "data_shapes": [
@@ -270,34 +223,29 @@ def main() -> int:
                     {"value": json.loads(encoded), "count": count}
                     for encoded, count in sorted(counter.items())
                 ]
-                for key, counter in sorted(safe_option_values[action].items())
+                for key, counter in sorted(safe_values[action].items())
             },
         })
 
-    unresolved_source_rows = [
-        {"label": item.label, "constant": item.constant, "provenance": item.provenance}
-        for item in UNRESOLVED_PALETTE_261
-    ]
-
     result = {
-        "catalog_format": 1,
+        "catalog_format": 2,
         "privacy": "shareable live lab coverage/field-type shapes only; raw node IDs and user-entered values omitted",
         "timestamp_utc": datetime.now(timezone.utc).isoformat(),
         "selected_by": selected_by,
-        "requested_lab_name": args.app_name if selected_by == "exact-name" else None,
-        "source_palette_rows": len(PALETTE_261),
-        "source_resolved_actions": len(expected),
-        "source_unresolved_actions": len(UNRESOLVED_PALETTE_261),
+        "source_registry_rows": len(PALETTE_261),
+        "resolved_source_action_constants": len(RESOLVED_ACTIONS_261),
+        "expected_serialized_action_nodes": len(expected),
+        "editor_structural_rows": [
+            {"label": item.label, "constant": item.constant, "source_action": item.action}
+            for item in EDITOR_STRUCTURAL_ROWS_261
+        ],
+        "source_unresolved_rows": len(UNRESOLVED_PALETTE_261),
         "flow_node_count": len(doc.nodes),
         "flow_edge_count": len(doc.edges),
-        "nodes_without_safe_action": nodes_without_safe_action,
-        "captured_resolved_actions": len(captured),
-        "missing_resolved_actions": len(missing),
+        "captured_action_nodes": len(captured),
+        "missing_action_nodes": sorted(missing),
         "coverage_ratio": round(len(captured) / len(expected), 4) if expected else 0.0,
-        "captured_palette_rows": captured_rows,
-        "missing_palette_rows": missing_rows,
-        "unresolved_source_rows": unresolved_source_rows,
-        "unmatched_observed_actions": [
+        "unexpected_actions": [
             {"action": action, "count": observed_counts[action]} for action in sorted(unexpected)
         ],
         "special_live_nodes_observed": [
@@ -316,23 +264,22 @@ def main() -> int:
     print("=" * 78)
     print("GENFARMER GF LAB NODE CATALOG AUDIT")
     print("=" * 78)
-    print(f"Source palette rows: {len(PALETTE_261)}")
-    print(f"Resolved source actions: {len(expected)}; unresolved source rows: {len(UNRESOLVED_PALETTE_261)}")
+    print(f"Source registry rows: {len(PALETTE_261)}")
+    print(f"Resolved source action constants: {len(RESOLVED_ACTIONS_261)}/60")
+    print(f"Expected serialized action nodes: {len(expected)}")
     print(f"Lab flow: nodes={len(doc.nodes)} edges={len(doc.edges)}")
-    print(f"Captured resolved actions: {len(captured)}/{len(expected)} ({result['coverage_ratio'] * 100:.1f}%)")
-    print(f"Missing resolved actions: {len(missing)}")
+    print(f"Captured action nodes: {len(captured)}/{len(expected)} ({result['coverage_ratio'] * 100:.1f}%)")
+    print(f"Missing action nodes: {len(missing)}")
+    if missing:
+        for action in sorted(missing):
+            print(f" - {action}")
+    print("Editor-structural rows not expected as data.action nodes:")
+    for item in EDITOR_STRUCTURAL_ROWS_261:
+        print(f" - {item.label}: {item.constant} source-action={item.action}")
     if unexpected:
-        print("Unmatched observed actions (important for resolving source ambiguity):")
+        print("Unexpected actions:")
         for action in sorted(unexpected):
             print(f" - {action}: count={observed_counts[action]}")
-    print("Still source-unresolved palette rows:")
-    for item in UNRESOLVED_PALETTE_261:
-        print(f" - {item.label}: {item.constant}")
-    if missing_rows:
-        n = max(1, args.batch_size)
-        print(f"Next missing palette labels (up to {n}):")
-        for row in missing_rows[:n]:
-            print(f" - {row['label']} -> {row['action']}")
     print(f"Shareable result: {out.relative_to(ROOT)}")
     print("GET only; no GenFarmer state was modified.")
     print("=" * 78)

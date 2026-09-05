@@ -40,15 +40,16 @@ Learn the GenFarmer 2.6.1 `script.flow` language exhaustively enough to create a
 - [x] Run `genfarmer_node_factory_ast.py` across 199 renderer assets.
 - [x] Confirm source factory/default mining produced `0/60` usable candidates at score >=20; only sparse switch evidence exists for Case Path, Comment, Loop, Multi Element exists and Stop.
 - [x] Adopt stopping rule: do not spend more time broad-mining minified renderer code for default node payloads unless a new high-confidence source path appears.
-- [x] Add versioned `palette_catalog_261.py` containing all 60 source-proven rows, 56 resolved actions and four explicit unresolved rows.
-- [x] Add GET-only `genfarmer_lab_catalog_audit.py` to measure live template coverage and report privacy-safe data/option field-type shapes.
+- [x] Add versioned `palette_catalog_261.py` containing all 60 source-proven rows and a GET-only lab coverage auditor.
+- [x] Create/use the dedicated `GF Lab - Node Catalog` app and run the first live audit.
+- [x] Resolve the first source-ambiguous action from exact saved flow evidence: `H.HTTP -> data.action HTTP`.
+- [x] Promote HTTP to `live-flow-anchor`; catalog status is now 57/60 resolved and 3 unresolved.
 
 ## In progress
 
-- [ ] Create a dedicated GenFarmer Automation App named `GF Lab - Node Catalog`.
+- [ ] Resolve the remaining source-ambiguous actions one at a time from live lab nodes: `Log`, `Random`, `Stop`.
 - [ ] Add source-proven palette nodes to the lab app in manageable batches, save, and run `scripts/genfarmer_lab_catalog_audit.py` after each batch.
 - [ ] Capture exact GenFarmer-generated `script.flow` templates for all 60 palette actions without fabricating payloads.
-- [ ] Resolve `HTTP`, `LOG`, `RANDOM`, and `STOP` from live saved nodes.
 - [ ] Run structural + semantic + routing learners against the lab app as coverage grows.
 - [ ] Populate the local-only template registry from exact private raw-flow evidence.
 - [ ] Learn one harmless failure route and every ambiguous option with one-field-at-a-time snapshots/diffs.

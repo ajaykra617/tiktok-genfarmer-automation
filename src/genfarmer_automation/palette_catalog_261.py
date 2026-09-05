@@ -1,7 +1,7 @@
 """Versioned source-derived GenFarmer 2.6.1 Automation palette catalog.
 
 This module records only privacy-safe palette metadata recovered from the
-installed GenFarmer 2.6.1 renderer AST.  It is *not* a node-template registry:
+installed GenFarmer 2.6.1 renderer AST. It is *not* a node-template registry:
 exact node payloads still come from live saved ``script.flow`` documents.
 
 Evidence levels used here:
@@ -55,7 +55,7 @@ PALETTE_261: tuple[PaletteAction261, ...] = (
     PaletteAction261("Install App", "H.INSTALL_APP", "InstallApp", "unique-source"),
     PaletteAction261("Is installed App", "H.IS_INSTALLED_APP", "IsInstalledApp", "unique-source"),
     PaletteAction261("Javascript", "H.JAVASCRIPT", "Javascript", "unique-source"),
-    PaletteAction261("Log", "H.LOG", None, "unresolved"),
+    PaletteAction261("Log", "H.LOG", "Log", "live-flow-anchor"),
     PaletteAction261("Loop", "H.LOOP", "Loop", "unique-source"),
     PaletteAction261("Loop V2", "H.LOOPV2", "LoopV2", "unique-source"),
     PaletteAction261("Multi Element exists", "H.MULTI_ELEMENT_EXISTS", "MultiElementExists", "unique-source"),
@@ -64,7 +64,7 @@ PALETTE_261: tuple[PaletteAction261, ...] = (
     PaletteAction261("Press Home", "H.PRESS_HOME", "PressHome", "unique-source"),
     PaletteAction261("Press key", "H.PRESS", "Press", "unique-source"),
     PaletteAction261("Press Menu", "H.PRESS_MENU", "PressMenu", "unique-source"),
-    PaletteAction261("Random", "H.RANDOM", None, "unresolved"),
+    PaletteAction261("Random", "H.RANDOM", "Random", "live-flow-anchor"),
     PaletteAction261("Read file / variable", "H.READ_FILE", "ReadFile", "unique-source"),
     PaletteAction261("Reconnect", "H.RECONNECT", "Reconnect", "unique-source"),
     PaletteAction261("RegExp (Data extraction)", "H.RegEx", "RegEx", "unique-source"),
@@ -74,7 +74,7 @@ PALETTE_261: tuple[PaletteAction261, ...] = (
     PaletteAction261("Sleep", "H.PAUSE", "Pause", "unique-source"),
     PaletteAction261("Spreadsheet", "H.SPREADSHEET", "Spreadsheet", "unique-source"),
     PaletteAction261("Start App", "H.START_APP", "StartApp", "unique-source"),
-    PaletteAction261("Stop", "H.STOP", None, "unresolved"),
+    PaletteAction261("Stop", "H.STOP", "Stop", "live-flow-anchor"),
     PaletteAction261("Stop App", "H.STOP_APP", "StopApp", "unique-source"),
     PaletteAction261("Swipe/Scroll", "H.SWIPE", "Swipe", "unique-source"),
     PaletteAction261("Toggle service", "H.TOGGLE_SERVICE", "ToggleService", "unique-source"),

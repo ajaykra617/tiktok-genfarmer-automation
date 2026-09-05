@@ -25,6 +25,7 @@
     "GF Lab - Chrome Qualification Phase A flow saved and audited green with 9 nodes and 6 intended routing edges",
     "Phase A routing verified as Start -> StartApp -> Adb -> Pause -> Screenshot -> StopApp -> Stop",
     "Chrome fixture page visibly reached through a GenFarmer run on Device #1",
+    "Chrome fixture upgraded with a same-origin server-side qualification beacon and /status counters",
     "GenFarmer fingerprint rotation previously proven",
     "XProxy service reachable and first-position proxy listeners available"
   ],
@@ -45,20 +46,24 @@
     "source-side default/settings mining reached diminishing returns; exact live templates plus targeted one-setting differentials are now authoritative",
     "the private exact 62-node flow is the cloning source while shareable tools expose only field/type shapes and safe defaults",
     "direct Chrome launch is independently proven outside GenFarmer",
-    "Phase A browser launch and success routing are now operational on Device #1",
-    "the current focus is Phase B: derive reliable native bounds/selectors for the fixture input/button/success target, then prove Touch, TypeText, ElementExists and Swipe",
+    "Phase A browser launch and success routing are operational on Device #1",
+    "standalone Android uiautomator dump is killed with exit 137 in the active GenFarmer/device session, while ADB itself remains healthy",
+    "Chrome Phase B therefore uses coordinate Touch for the fixture and keeps native-selector qualification separate for TikTok",
+    "the fixture server now records only pass/submitted counters so Touch + TypeText + submit can be verified without relying on UIAutomator",
     "proxy qualification follows the direct browser lane so automation and network failures remain separable"
   ],
   "blockers": [
-    "action-specific non-default settings, enums and selector variants remain unproven for Phase B actions",
+    "coordinate Touch and TypeText serialization/runtime still need Phase B proof",
+    "native selector behavior remains unproven and will be qualified separately on TikTok/native Android UI",
     "failure/branch edge semantics remain incomplete",
     "the reported live XProxy position still needs an end-to-end HTTP(S) egress check and external-IP evidence before proxy-required workflows are enabled"
   ],
   "next": [
-    "while the fixture page is deliberately left visible, run scripts/chrome_fixture_ui_probe.py to capture native UIAutomator bounds and selector visibility",
-    "use that evidence to configure Touch -> TypeText -> Touch submit -> ElementExists success -> Swipe/Scroll",
-    "re-enable the normal Stop/termination path after the UI-probe experiment",
-    "audit and execute the complete Phase B Chrome qualification repeatedly without manual intervention",
+    "restart the updated fixture server and inspect /status baseline",
+    "configure Phase B with coordinate Touch on the fixture input, TypeText with an empty selector, coordinate Touch on Submit, then Screenshot/Swipe as needed",
+    "verify the fixture /status pass counter increments after the GenFarmer run",
+    "capture exact Touch/TypeText option serialization from the saved Phase B flow",
+    "re-enable the normal Stop/termination path and repeat the complete Chrome qualification without manual intervention",
     "qualify the reported live XProxy position with a real request through the proxy and keep external-IP evidence local/ignored",
     "then begin the authorized TikTok qualification workflow"
   ]

@@ -22,6 +22,8 @@
     "Chrome package and HTTP VIEW handler resolved on Device #1",
     "direct Android browser launch smoke succeeded and resolved to ChromeTabbedActivity",
     "local deterministic Chrome fixture health check succeeded",
+    "GF Lab - Chrome Qualification Phase A flow saved and audited green with 9 nodes and 6 intended routing edges",
+    "Phase A routing verified as Start -> StartApp -> Adb -> Pause -> Screenshot -> StopApp -> Stop",
     "GenFarmer fingerprint rotation previously proven",
     "XProxy service reachable and first-position proxy listeners available"
   ],
@@ -39,23 +41,24 @@
     "ContextMenu uniquely exposes options.casePaths by default; Loop has family loop with data.startLoopNode and no options; Comment and Variables are helper-family nodes; Start is input-family and Stop is output-family",
     "source-side default/settings mining reached diminishing returns; exact live templates plus targeted one-setting differentials are now authoritative",
     "the private exact 62-node flow is the cloning source while shareable tools expose only field/type shapes and safe defaults",
-    "Chrome qualification is the current integration lane before TikTok-specific workflows",
-    "direct Chrome launch is now independently proven outside GenFarmer; the next gate is the same launch/routing through a small GenFarmer flow",
-    "proxy qualification will be run immediately after direct Chrome qualification so automation and network failures remain separable"
+    "direct Chrome launch is independently proven outside GenFarmer",
+    "the dedicated Chrome Phase A flow is structurally ready and its saved success routing is exact",
+    "the next gate is runtime execution on Device #1 with fixture request and screenshot evidence",
+    "proxy qualification follows the direct runtime gate so automation and network failures remain separable"
   ],
   "blockers": [
-    "action-specific non-default settings, enums and selector variants are not yet proven for configurable actions because untouched defaults omit them",
-    "success/failure/branch edge semantics remain incomplete because the full catalog flow intentionally has zero edges",
+    "Chrome Phase A still needs actual GenFarmer runtime execution evidence on Device #1",
+    "action-specific non-default settings, enums and selector variants remain unproven for Phase B actions",
+    "failure/branch edge semantics remain incomplete",
     "the reported live XProxy position still needs an end-to-end HTTP(S) egress check and external-IP evidence before proxy-required workflows are enabled"
   ],
   "next": [
-    "create GF Lab - Chrome Qualification in GenFarmer",
-    "configure Start App for the installed Chrome package, open the fixture URL, wait, capture a screenshot, stop Chrome and terminate the flow",
-    "save and run scripts/genfarmer_chrome_qualification_audit.py to capture exact routing",
-    "execute the Phase A flow repeatedly on Device #1",
-    "qualify the reported live XProxy position with a real request through the proxy and record the external IP only in ignored evidence",
+    "execute GF Lab - Chrome Qualification Phase A on Device #1 while the local fixture server is running",
+    "confirm the fixture server receives the browser GET request and Chrome opens the qualification page",
+    "confirm Screenshot executes before Stop App and the flow reaches Stop without manual intervention",
+    "repeat the Phase A runtime several times once the first execution is green",
+    "qualify the reported live XProxy position with a real request through the proxy and keep external-IP evidence local/ignored",
     "extend the Chrome flow with Touch, TypeText, Press, ElementExists and Swipe/Scroll",
-    "then begin the authorized TikTok qualification workflow",
-    "continue targeted setting differentials only for nodes the Chrome/TikTok workflows actually require"
+    "then begin the authorized TikTok qualification workflow"
   ]
 }

@@ -16,31 +16,32 @@
     "all 59 standalone palette action-node rows are represented by exact saved data.action templates",
     "the three special editor nodes Start, Variables and ContextMenu are also present",
     "exact private raw lab flow captured locally plus privacy-safe template inventory",
-    "full live settings schema matrix tooling implemented",
+    "full live settings schema matrix executed for all 62 actions",
+    "targeted one-setting before/after differential probe implemented",
     "GenFarmer fingerprint rotation previously proven",
     "XProxy service reachable and first-position proxy listeners available"
   ],
   "current_findings": [
     "node.type is a rendering family and data.action is the semantic discriminator for serialized action nodes",
-    "the renderer source registry has 60 rows but one row, Group Node, belongs to the separate Ht.* editor-structural namespace",
+    "the renderer source registry has 60 rows but Group Node belongs to the separate Ht.* editor-structural namespace",
     "the exhaustive live lab flow has 62 distinct data.action nodes: 59 ordinary palette action nodes plus Start, Variables and ContextMenu",
-    "no live node lacks a safe data.action in the completed lab capture",
-    "GroupNode is not present as a serialized data.action despite the user adding every available node and despite every ordinary H.* action row being captured",
-    "Group Node is therefore classified as an editor-structural source row rather than a missing standalone action template",
+    "GroupNode is not present as a serialized data.action despite the exhaustive standalone-node capture and remains classified as editor-structural",
     "the previously ambiguous actions are exact from live evidence: H.HTTP->HTTP, H.LOG->Log, H.RANDOM->Random, H.STOP->Stop",
-    "source-side default/settings mining reached diminishing returns; exact live templates are now authoritative",
+    "the live schema matrix confirms the common custom-node runtime option set is exactly breakpoint, disabled, nodeLog, nodeSleep, nodeTimeout, timeoutAdbReconnect and timeoutNextNode",
+    "nearly every untouched configurable custom node serializes only those seven common runtime options; action-specific settings are therefore lazy/non-default and must be learned after an actual UI configuration change",
+    "ContextMenu uniquely exposes options.casePaths by default; Loop has family loop with data.startLoopNode and no options; Comment and Variables are helper-family nodes; Start is input-family and Stop is output-family",
+    "source-side default/settings mining reached diminishing returns; exact live templates plus targeted one-setting differentials are now authoritative",
     "the private exact 62-node flow is the cloning source while shareable tools expose only field/type shapes and safe defaults"
   ],
   "blockers": [
-    "non-default setting modes, enums and selector variants are not yet proven for every action",
+    "action-specific non-default settings, enums and selector variants are not yet proven for configurable actions because untouched defaults omit them",
     "success/failure/branch edge semantics remain incomplete because the full catalog flow intentionally has zero edges",
     "first cellular modem/SIM does not yet expose a verified mobile public IP"
   ],
   "next": [
-    "run tests/test_palette_catalog_261.py after pulling the action-node/editor-structural classification",
-    "run scripts/genfarmer_lab_catalog_audit.py and confirm 59/59 serialized action-node coverage",
-    "run scripts/genfarmer_lab_schema_matrix.py to extract the full per-action data/options settings schema",
-    "rank action-specific settings that need one-field differential tests",
+    "use scripts/genfarmer_setting_probe.py before/after around exactly one UI change on one node",
+    "start with high-value TikTok-control actions such as Touch, TypeText, Swipe, StartApp, ElementExists and Press",
+    "repeat targeted differentials for selector modes, app fields, gestures, input and wait/range semantics",
     "extend TemplateRegistry loading for the exact private lab flow and verify all 62 live semantic kinds are cloneable",
     "create a separate tiny routing lab to learn success, failure and branch edges",
     "prove a harmless Python-authored flow on Device #1"

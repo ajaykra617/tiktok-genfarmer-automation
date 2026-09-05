@@ -2,7 +2,7 @@
 
 ## Current milestone
 
-Learn the exact GenFarmer 2.6.1 live node settings/default schema and then verify non-default modes with small differential tests.
+Learn GenFarmer 2.6.1 non-default node settings with targeted one-setting differentials, then verify routing and generate a harmless flow from exact templates.
 
 ## Completed
 
@@ -19,17 +19,20 @@ Learn the exact GenFarmer 2.6.1 live node settings/default schema and then verif
 - [x] Full live lab capture: 62 nodes, 0 edges, 62 distinct `data.action` values, no nodes without safe `data.action`.
 - [x] Confirm all 59 ordinary `H.*` palette action rows are represented by live saved action-node templates.
 - [x] Confirm the three special editor nodes `Start`, `Variables`, `ContextMenu` are present.
-- [x] Reclassify `Group Node` (`Ht.GROUP_NODE -> GroupNode`) as an editor-structural source row rather than a missing standalone `data.action` node; it is the only `Ht.*` row and was not instantiated by the exhaustive live node capture.
+- [x] Reclassify `Group Node` (`Ht.GROUP_NODE -> GroupNode`) as an editor-structural source row rather than a missing standalone `data.action` node.
 - [x] Capture the exact 62-node flow privately under ignored evidence and emit a privacy-safe structural inventory.
-- [x] Add `genfarmer_lab_schema_matrix.py` to extract complete live `data`/`options` field-type schemas, action-specific settings and safe primitive defaults.
+- [x] Execute `genfarmer_lab_schema_matrix.py` across all 62 live actions.
+- [x] Confirm the common runtime option set is exactly `breakpoint`, `disabled`, `nodeLog`, `nodeSleep`, `nodeTimeout`, `timeoutAdbReconnect`, `timeoutNextNode`.
+- [x] Confirm untouched configurable custom nodes generally contain only those seven runtime options; action-specific settings are not serialized until configured.
+- [x] Confirm structural exceptions: `ContextMenu` exposes `options.casePaths`; `Loop` is family `loop` with `data.startLoopNode`; `Comment`/`Variables` are helper family; `Start` is input family; `Stop` is output family.
+- [x] Add `genfarmer_setting_probe.py` for action-scoped GET-only before/after learning of exactly one UI setting while masking sensitive values.
 
 ## In progress
 
-- [ ] Pull the latest catalog classification and run `python -m pytest tests/test_palette_catalog_261.py`.
-- [ ] Run `scripts/genfarmer_lab_catalog_audit.py` and confirm 59/59 standalone action-node coverage.
-- [ ] Run `scripts/genfarmer_lab_schema_matrix.py` and inspect all 62 live action schemas.
-- [ ] Separate common runtime controls from action-specific settings for every node.
-- [ ] Rank settings/modes that require one-field-at-a-time before/after diffs because default templates alone cannot prove every enum or selector variant.
+- [ ] Learn the first high-value action-specific setting with `genfarmer_setting_probe.py`.
+- [ ] Prioritize `Touch`, `TypeText`, `Swipe`, `StartApp`, `ElementExists`, `Press`, `Pause`, `Random`, `Clipboard`, `CheckActivity`, `ClearAppData`, `GetProperty`, `GetAttributeValue`, `Xpath`.
+- [ ] For each action, change only one setting per experiment, save, compare, record exact field path/type/enum semantics, then reset the baseline.
+- [ ] Learn selector modes, app/package/activity fields, input modes, gestures, range/wait semantics and output-variable behavior without guessing.
 - [ ] Extend the local `TemplateRegistry` to load the exact private flow file directly and verify all 62 live semantic kinds are cloneable.
 - [ ] Create a separate tiny routing lab for success/failure/branch edge semantics so the full catalog corpus remains stable and unconnected.
 - [ ] Run the official Postman analyzer and compare the API contract against our client.
@@ -45,13 +48,13 @@ Learn the exact GenFarmer 2.6.1 live node settings/default schema and then verif
 - **Live-flow anchor:** saved lab flow resolves a source-ambiguous action literal.
 - **Lab-captured template:** exact GenFarmer-generated node object exists in the ignored private lab flow.
 - **Editor-structural source row:** source UI/editor operation not expected as a standalone serialized action node; currently `Group Node`.
-- **Differentially verified setting:** one UI setting changed in isolation and the before/after flow diff proves its serialized semantics.
+- **Differentially verified setting:** one UI setting changed in isolation and the targeted before/after diff proves its serialized semantics.
 
 ## Specific semantics still to learn
 
 - [ ] app launch/stop/install/uninstall/data-clear non-default options;
 - [ ] touch selector modes and coordinates/text/resource-id/class/XPath behavior;
-- [ ] random/range semantics;
+- [ ] random/range and Sleep timeout-mode semantics beyond observed defaults;
 - [ ] swipe/scroll gesture modes;
 - [ ] type/clipboard/input details;
 - [ ] variables and output/storage behavior;
@@ -60,7 +63,7 @@ Learn the exact GenFarmer 2.6.1 live node settings/default schema and then verif
 - [ ] file/spreadsheet/HTTP/IMAP/AI options;
 - [ ] screenshot/image-search/asset-storage behavior;
 - [ ] network/device/system node options;
-- [ ] required fields, optional fields and enum values for every action.
+- [ ] required fields, optional fields and enum values for every configurable action.
 
 ## External hardware dependency
 

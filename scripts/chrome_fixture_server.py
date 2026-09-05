@@ -5,13 +5,26 @@ Serves a deterministic page over the LAN with stable element IDs and no
 external dependencies. The page includes a text input, button, success marker,
 and a tall scroll region so GenFarmer Touch/TypeText/Press/Swipe/Screenshot
 flows can be qualified without relying on third-party websites.
+
+A same-origin submission beacon records only a pass/submitted result. This lets
+us verify that coordinate Touch + TypeText actually completed even when the
+Android UI hierarchy is unavailable. No typed value or client data is stored.
 """
 from __future__ import annotations
 
 import argparse
 import json
 import socket
+import threading
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from urllib.parse import parse_qs, urlparse
+
+STATE_LOCK = threading.Lock()
+STATE = {
+    "submissions": 0,
+    "passes": 0,
+    "last_result": None,
+}
 
 HTML = r'''<!doctype html>
 <html lang="en">
@@ -45,9 +58,15 @@ HTML = r'''<!doctype html>
     window.__GF_READY__ = true;
     document.getElementById('gf-submit').addEventListener('click', function () {
       var value = document.getElementById('gf-message').value;
+      var result = value === 'GENFARMER-OK' ? 'pass' : 'submitted';
       document.getElementById('gf-echo').textContent = value;
       document.getElementById('gf-success').style.display = 'block';
-      document.body.setAttribute('data-gf-result', value === 'GENFARMER-OK' ? 'pass' : 'submitted');
+      document.body.setAttribute('data-gf-result', result);
+      fetch('/qualified?result=' + encodeURIComponent(result), {
+        method: 'GET',
+        cache: 'no-store',
+        credentials: 'omit'
+      }).catch(function () {});
     });
   </script>
 </body>
@@ -56,21 +75,51 @@ HTML = r'''<!doctype html>
 
 
 class Handler(BaseHTTPRequestHandler):
-    server_version = "GFFixture/1.0"
+    server_version = "GFFixture/1.1"
 
     def log_message(self, fmt: str, *args: object) -> None:
         print("[fixture] " + (fmt % args))
 
+    def _send_json(self, status: int, payload: object) -> None:
+        body = json.dumps(payload, separators=(",", ":")).encode("utf-8")
+        self.send_response(status)
+        self.send_header("Content-Type", "application/json")
+        self.send_header("Cache-Control", "no-store")
+        self.send_header("Content-Length", str(len(body)))
+        self.end_headers()
+        self.wfile.write(body)
+
     def do_GET(self) -> None:  # noqa: N802
-        if self.path == "/healthz":
-            body = json.dumps({"ok": True, "fixture": "gf-browser-qualification"}).encode("utf-8")
-            self.send_response(200)
-            self.send_header("Content-Type", "application/json")
-            self.send_header("Content-Length", str(len(body)))
-            self.end_headers()
-            self.wfile.write(body)
+        parsed = urlparse(self.path)
+        path = parsed.path
+
+        if path == "/healthz":
+            self._send_json(200, {"ok": True, "fixture": "gf-browser-qualification"})
             return
-        if self.path not in {"/", "/index.html"}:
+
+        if path == "/status":
+            with STATE_LOCK:
+                payload = dict(STATE)
+            self._send_json(200, payload)
+            return
+
+        if path == "/qualified":
+            query = parse_qs(parsed.query)
+            result = (query.get("result") or [""])[0]
+            if result not in {"pass", "submitted"}:
+                self._send_json(400, {"ok": False, "error": "invalid-result"})
+                return
+            with STATE_LOCK:
+                STATE["submissions"] += 1
+                if result == "pass":
+                    STATE["passes"] += 1
+                STATE["last_result"] = result
+                payload = {"ok": True, **STATE}
+            print(f"[fixture] qualification result={result} submissions={payload['submissions']} passes={payload['passes']}")
+            self._send_json(200, payload)
+            return
+
+        if path not in {"/", "/index.html"}:
             self.send_error(404)
             return
         self.send_response(200)
@@ -107,8 +156,10 @@ def main() -> int:
     print(f"Listening: http://{args.bind}:{args.port}/")
     print(f"Android URL: http://{host}:{args.port}/")
     print(f"Health:      http://{host}:{args.port}/healthz")
+    print(f"Status:      http://{host}:{args.port}/status")
     print("Expected page title: GF Browser Qualification")
     print("Expected typed value: GENFARMER-OK")
+    print("A successful Submit records result=pass without storing the typed value.")
     print("Press Ctrl+C to stop.")
     print("=" * 78)
     try:

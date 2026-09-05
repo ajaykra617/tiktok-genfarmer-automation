@@ -28,7 +28,8 @@
     "XProxy service reachable and first-position proxy listeners available"
   ],
   "operator_reported_capabilities": [
-    "one XProxy position is now live/working; independent end-to-end proxy qualification is still pending"
+    "one XProxy position is now live/working; independent end-to-end proxy qualification is still pending",
+    "GF Lab - Chrome Qualification Phase A was executed on Device #1 and the operator reports the run is done; fixture/screenshot/run-result evidence has not yet been independently captured in the repo"
   ],
   "current_findings": [
     "node.type is a rendering family and data.action is the semantic discriminator for serialized action nodes",
@@ -43,22 +44,21 @@
     "the private exact 62-node flow is the cloning source while shareable tools expose only field/type shapes and safe defaults",
     "direct Chrome launch is independently proven outside GenFarmer",
     "the dedicated Chrome Phase A flow is structurally ready and its saved success routing is exact",
-    "the next gate is runtime execution on Device #1 with fixture request and screenshot evidence",
-    "proxy qualification follows the direct runtime gate so automation and network failures remain separable"
+    "the operator reports the first Phase A runtime execution is complete; the next engineering step is Phase B UI primitives while collecting stronger runtime evidence",
+    "proxy qualification follows the direct browser lane so automation and network failures remain separable"
   ],
   "blockers": [
-    "Chrome Phase A still needs actual GenFarmer runtime execution evidence on Device #1",
+    "Chrome Phase A runtime needs stronger evidence capture (fixture request/run result/screenshot) before being promoted from operator-reported to verified",
     "action-specific non-default settings, enums and selector variants remain unproven for Phase B actions",
     "failure/branch edge semantics remain incomplete",
     "the reported live XProxy position still needs an end-to-end HTTP(S) egress check and external-IP evidence before proxy-required workflows are enabled"
   ],
   "next": [
-    "execute GF Lab - Chrome Qualification Phase A on Device #1 while the local fixture server is running",
-    "confirm the fixture server receives the browser GET request and Chrome opens the qualification page",
-    "confirm Screenshot executes before Stop App and the flow reaches Stop without manual intervention",
-    "repeat the Phase A runtime several times once the first execution is green",
+    "extend the Chrome qualification flow with Touch, TypeText, Press, ElementExists and Swipe/Scroll",
+    "use the local fixture page to prove input, submit, success detection and scrolling deterministically",
+    "capture fixture request/run-result/screenshot evidence on the next execution",
     "qualify the reported live XProxy position with a real request through the proxy and keep external-IP evidence local/ignored",
-    "extend the Chrome flow with Touch, TypeText, Press, ElementExists and Swipe/Scroll",
+    "repeat the complete Chrome qualification several times without manual intervention",
     "then begin the authorized TikTok qualification workflow"
   ]
 }

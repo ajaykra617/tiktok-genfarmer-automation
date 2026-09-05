@@ -27,11 +27,11 @@ The page is self-contained and exposes stable controls:
 - scroll target id: `gf-scroll-target`
 - expected test text: `GENFARMER-OK`
 
-Recommended first GenFarmer chain:
+Minimum first GenFarmer chain:
 
-`Start -> Start App -> ADB shell command -> Sleep -> Screenshot -> Stop App -> Stop`
+`Start -> Start App -> ADB shell command -> Screenshot -> Stop App -> Stop`
 
-The ADB node should open the fixture URL in the installed browser using an Android VIEW intent. Keep the exact command local/private; do not commit client/device-specific values.
+The ADB node should open the fixture URL in the installed browser using an Android VIEW intent and may include a short local shell delay before returning so the page is rendered before Screenshot. This keeps Phase A independent of yet-unlearned Pause settings. Keep the exact command local/private; do not commit client/device-specific values.
 
 After saving the flow, run:
 
@@ -45,6 +45,7 @@ The audit is GET-only, stores the exact flow under ignored private evidence, and
 
 Once Phase A runs successfully several times, extend the same flow with the minimum UI primitives needed later by TikTok:
 
+- Sleep/Pause
 - Touch
 - Type text
 - Press key

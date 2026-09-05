@@ -7,13 +7,14 @@ Usage:
     # change exactly ONE setting on the Touch node in GF Lab - Node Catalog and save
     python scripts/genfarmer_setting_probe.py after --action Touch
 
-The script reads the dedicated lab app with GET requests only, selects exactly
-one node by ``data.action``, stores exact before/after nodes under ignored private
-evidence, and emits a shareable privacy-safe field diff.
+The script reads the dedicated lab app with GET requests only.  It stores the
+exact selected node *and the exact whole flow* under ignored private evidence.
+The after phase reports both selected-node changes and whether anything changed
+elsewhere in script.flow.  This distinction is important when a GenFarmer UI
+control is transient, default-equivalent, saved outside the selected node, or
+was not persisted at all.
 
-This is intentionally action-scoped: the full lab contains one node per action,
-so a one-setting UI change can be mapped directly to its serialized field path
-without noise from the other 61 nodes.
+Shareable output never exposes raw node IDs or user-entered strings.
 """
 from __future__ import annotations
 
@@ -38,8 +39,6 @@ from genfarmer_automation.genfarmer_client import GenFarmerClient, GenFarmerErro
 SAFE_TOKEN_RE = re.compile(r"^[A-Za-z0-9_.:/+-]{1,80}$")
 SAFE_ACTION_RE = re.compile(r"^[A-Za-z0-9_.:-]{1,120}$")
 
-# Fields whose string values can contain app/client/user content and therefore
-# must always be masked in the shareable report.
 SENSITIVE_LEAF_HINTS = {
     "text", "value", "xpath", "selector", "resourceid", "resource_id", "id",
     "packagename", "package", "activity", "command", "url", "uri", "body",
@@ -49,8 +48,6 @@ SENSITIVE_LEAF_HINTS = {
     "query", "data", "name", "label", "description", "content",
 }
 
-# These leaf names are strongly enum/implementation-like. Short token values
-# are useful for reverse engineering and are safe to reveal.
 SAFE_ENUM_LEAVES = {
     "action", "type", "mode", "method", "direction", "operator", "condition",
     "strategy", "timeouttype", "behavior", "operation", "sourceposition",
@@ -175,6 +172,11 @@ def digest_text(value: str) -> str:
     return hashlib.sha256(value.encode("utf-8")).hexdigest()[:10]
 
 
+def canonical_sha(value: Any) -> str:
+    raw = json.dumps(value, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
+    return hashlib.sha256(raw.encode("utf-8")).hexdigest()
+
+
 def leaf_name(path: str) -> str:
     token = path.rsplit(".", 1)[-1]
     token = re.sub(r"\[\d+\]$", "", token)
@@ -194,8 +196,6 @@ def display_value(path: str, value: Any) -> Any:
     if value is None or isinstance(value, bool):
         return value
     if isinstance(value, (int, float)):
-        # Numeric UI settings such as timeouts/coordinates are not secrets and
-        # seeing the exact changed number is useful for serialization learning.
         return value
     if isinstance(value, str):
         if not is_sensitive_leaf(leaf) and leaf in SAFE_ENUM_LEAVES and SAFE_TOKEN_RE.fullmatch(value):
@@ -228,7 +228,7 @@ def safe_action_path(action: str) -> str:
     return re.sub(r"[^A-Za-z0-9_.-]+", "_", action)[:80]
 
 
-def current_node(args: argparse.Namespace) -> dict[str, Any]:
+def current_state(args: argparse.Namespace) -> tuple[dict[str, Any], dict[str, Any]]:
     load_dotenv(ROOT / ".env")
     base_url = os.getenv("GENFARMER_BASE_URL")
     if not base_url:
@@ -240,7 +240,7 @@ def current_node(args: argparse.Namespace) -> dict[str, Any]:
     if flow is None:
         raise GenFarmerError("selected lab app has no script.flow")
     doc = FlowDocument.from_flow(flow)
-    return select_node(doc, args.action)
+    return select_node(doc, args.action), doc.to_dict()
 
 
 def main() -> int:
@@ -256,7 +256,7 @@ def main() -> int:
         return 2
 
     try:
-        node = current_node(args)
+        node, flow = current_state(args)
     except (GenFarmerError, Exception) as exc:
         print(f"ERROR: {exc}", file=sys.stderr)
         return 1
@@ -266,25 +266,31 @@ def main() -> int:
     private_dir.mkdir(parents=True, exist_ok=True)
     before_path = private_dir / "before.raw.json"
     after_path = private_dir / "after.raw.json"
+    before_flow_path = private_dir / "before.flow.raw.json"
+    after_flow_path = private_dir / "after.flow.raw.json"
 
     if args.phase == "before":
         before_path.write_text(json.dumps(node, ensure_ascii=False, indent=2), encoding="utf-8")
-        if after_path.exists():
-            after_path.unlink()
+        before_flow_path.write_text(json.dumps(flow, ensure_ascii=False, indent=2), encoding="utf-8")
+        for stale in (after_path, after_flow_path):
+            if stale.exists():
+                stale.unlink()
         print("=" * 78)
         print("GENFARMER TARGETED SETTING PROBE - BASELINE")
         print("=" * 78)
         print(f"Action: {args.action}")
+        print(f"Selected-node SHA-256: {canonical_sha(node)}")
+        print(f"Whole-flow SHA-256:    {canonical_sha(flow)}")
         print(f"Private baseline: {before_path.relative_to(ROOT)}")
-        print("Now change exactly ONE setting on this node in GenFarmer, save the app, then run:")
+        print("Now change exactly ONE setting on this node in GenFarmer, SAVE/APPLY it, then run:")
         print(f"  python scripts/genfarmer_setting_probe.py after --action {args.action}")
         print("GET only; no GenFarmer state was modified.")
         print("=" * 78)
         return 0
 
-    if not before_path.exists():
+    if not before_path.exists() or not before_flow_path.exists():
         print(
-            f"ERROR: baseline missing for {args.action}; first run: "
+            f"ERROR: V2 baseline missing for {args.action}; first run: "
             f"python scripts/genfarmer_setting_probe.py before --action {args.action}",
             file=sys.stderr,
         )
@@ -292,23 +298,45 @@ def main() -> int:
 
     try:
         before = json.loads(before_path.read_text(encoding="utf-8"))
+        before_flow = json.loads(before_flow_path.read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError) as exc:
         print(f"ERROR: cannot read baseline: {exc}", file=sys.stderr)
         return 1
-    if not isinstance(before, Mapping):
-        print("ERROR: baseline node is malformed", file=sys.stderr)
+    if not isinstance(before, Mapping) or not isinstance(before_flow, Mapping):
+        print("ERROR: baseline is malformed", file=sys.stderr)
         return 1
 
     after_path.write_text(json.dumps(node, ensure_ascii=False, indent=2), encoding="utf-8")
+    after_flow_path.write_text(json.dumps(flow, ensure_ascii=False, indent=2), encoding="utf-8")
     changes = compare(before, node)
+    before_flow_sha = canonical_sha(before_flow)
+    after_flow_sha = canonical_sha(flow)
+    whole_flow_changed = before_flow_sha != after_flow_sha
+
+    # We intentionally do not expose arbitrary whole-flow field values.  The
+    # diagnostic only answers whether something changed outside the selected
+    # node and reports coarse counts/hashes.
+    before_nodes = before_flow.get("nodes") if isinstance(before_flow.get("nodes"), list) else []
+    after_nodes = flow.get("nodes") if isinstance(flow.get("nodes"), list) else []
+    before_edges = before_flow.get("edges") if isinstance(before_flow.get("edges"), list) else []
+    after_edges = flow.get("edges") if isinstance(flow.get("edges"), list) else []
+
     stamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
     report = {
-        "catalog_format": 1,
-        "privacy": "shareable targeted node diff; sensitive string values are hashed/masked",
+        "catalog_format": 2,
+        "privacy": "shareable targeted node diff plus whole-flow change diagnostics; sensitive values remain private",
         "timestamp_utc": datetime.now(timezone.utc).isoformat(),
         "action": args.action,
+        "selected_node_changed": bool(changes),
         "changed_path_count": len(changes),
         "changes": changes,
+        "whole_flow_changed": whole_flow_changed,
+        "before_flow_sha256": before_flow_sha,
+        "after_flow_sha256": after_flow_sha,
+        "before_node_count": len(before_nodes),
+        "after_node_count": len(after_nodes),
+        "before_edge_count": len(before_edges),
+        "after_edge_count": len(after_edges),
     }
     shareable = study_dir / f"diff-{stamp}.shareable.json"
     shareable.write_text(json.dumps(report, ensure_ascii=False, indent=2), encoding="utf-8")
@@ -317,14 +345,21 @@ def main() -> int:
     print("GENFARMER TARGETED SETTING PROBE - DIFF")
     print("=" * 78)
     print(f"Action: {args.action}")
-    print(f"Changed paths: {len(changes)}")
+    print(f"Selected node changed: {'YES' if changes else 'NO'}")
+    print(f"Whole flow changed:    {'YES' if whole_flow_changed else 'NO'}")
+    print(f"Changed node paths: {len(changes)}")
     if not changes:
-        print(" - no serialized change detected")
+        if whole_flow_changed:
+            print(" - the selected node is unchanged, but script.flow changed elsewhere")
+            print(" - this setting may serialize outside the selected node; keep this evidence")
+        else:
+            print(" - no serialized change anywhere in script.flow")
+            print(" - likely causes: change was not saved/applied, value stayed default-equivalent, or the control is transient")
     else:
         for item in changes:
             print(f" - {item['path']}: {item['before']} -> {item['after']}")
-    print(f"Private before: {before_path.relative_to(ROOT)}")
-    print(f"Private after:  {after_path.relative_to(ROOT)}")
+    print(f"Private before node: {before_path.relative_to(ROOT)}")
+    print(f"Private after node:  {after_path.relative_to(ROOT)}")
     print(f"Shareable diff: {shareable.relative_to(ROOT)}")
     print("For another one-setting experiment, run the BEFORE phase again to reset the baseline.")
     print("GET only; no GenFarmer state was modified.")

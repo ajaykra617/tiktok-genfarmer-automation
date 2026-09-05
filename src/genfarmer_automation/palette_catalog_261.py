@@ -6,10 +6,15 @@ exact node payloads still come from live saved ``script.flow`` documents.
 
 Evidence levels used here:
 - ``unique-source``: one unambiguous literal was structurally resolved for the
-  palette action constant;
+  source registry action constant;
 - ``live-flow-anchor``: exact ``data.action`` was independently observed in a
-  saved GenFarmer flow, including the dedicated lab catalog flow;
-- ``unresolved``: source evidence was ambiguous and no guess is made.
+  saved GenFarmer flow, including the dedicated lab catalog flow.
+
+Most rows are real serialized action nodes. ``Group Node`` is different: it is
+the only ``Ht.*`` row and an exhaustive 62-node live lab capture did not produce
+``data.action=GroupNode`` while all 59 ordinary ``H.*`` action-node rows were
+captured. It is therefore classified separately as an editor-structural row and
+is not counted as a missing serialized action template.
 """
 from __future__ import annotations
 
@@ -22,6 +27,7 @@ class PaletteAction261:
     constant: str
     action: str | None
     provenance: str
+    role: str = "action-node"
 
 
 PALETTE_261: tuple[PaletteAction261, ...] = (
@@ -46,7 +52,7 @@ PALETTE_261: tuple[PaletteAction261, ...] = (
     PaletteAction261("Get attribute", "H.GET_ATTRIBUTE_VALUE", "GetAttributeValue", "unique-source"),
     PaletteAction261("Get property", "H.GET_PROPERTY", "GetProperty", "unique-source"),
     PaletteAction261("Grok", "H.GROK", "Grok", "unique-source"),
-    PaletteAction261("Group Node", "Ht.GROUP_NODE", "GroupNode", "unique-source"),
+    PaletteAction261("Group Node", "Ht.GROUP_NODE", "GroupNode", "unique-source", "editor-structural"),
     PaletteAction261("HTTP", "H.HTTP", "HTTP", "live-flow-anchor"),
     PaletteAction261("If", "H.IF", "If", "unique-source"),
     PaletteAction261("Image search", "H.IMAGE", "Image", "unique-source"),
@@ -87,11 +93,20 @@ PALETTE_261: tuple[PaletteAction261, ...] = (
     PaletteAction261("Xpath", "H.XPATH", "Xpath", "unique-source"),
 )
 
-RESOLVED_ACTIONS_261 = frozenset(item.action for item in PALETTE_261 if item.action)
+# Source resolution includes the editor-structural Group Node row.
+RESOLVED_SOURCE_ACTIONS_261 = frozenset(item.action for item in PALETTE_261 if item.action)
+RESOLVED_ACTIONS_261 = RESOLVED_SOURCE_ACTIONS_261  # backward-compatible name
 UNRESOLVED_PALETTE_261 = tuple(item for item in PALETTE_261 if item.action is None)
 
+# Only these are expected to appear as standalone serialized ``data.action``
+# nodes in the exhaustive lab capture.
+LIVE_NODE_ACTIONS_261 = frozenset(
+    item.action for item in PALETTE_261 if item.action and item.role == "action-node"
+)
+EDITOR_STRUCTURAL_ROWS_261 = tuple(item for item in PALETTE_261 if item.role == "editor-structural")
+
 # Special editor nodes already observed in real flows but not part of the 60
-# direct label/action/icon action palette rows above.
+# direct label/action/icon source registry rows above.
 SPECIAL_LIVE_NODES_261 = ("Start", "Variables", "ContextMenu")
 
 

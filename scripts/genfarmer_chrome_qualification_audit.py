@@ -28,17 +28,20 @@ from genfarmer_automation.genfarmer_client import GenFarmerClient, GenFarmerErro
 
 SAFE_TOKEN_RE = re.compile(r"^[A-Za-z0-9_.:/+-]{1,120}$")
 
+# Phase A intentionally avoids depending on action-specific UI settings beyond
+# StartApp/Adb. The ADB node can open the fixture URL and include a short shell
+# delay before the screenshot. Pause is learned/qualified in Phase B.
 PHASE_A_REQUIRED = (
     "Start",
     "StartApp",
     "Adb",
-    "Pause",
     "Screenshot",
     "StopApp",
     "Stop",
 )
 
 PHASE_B_REQUIRED = (
+    "Pause",
     "Touch",
     "TypeText",
     "Press",

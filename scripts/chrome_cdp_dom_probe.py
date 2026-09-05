@@ -123,7 +123,6 @@ def main() -> int:
             err = proc.stderr.decode(errors="replace").strip()
             raise RuntimeError(err or "could not create Chrome DevTools adb forward")
 
-        # Chrome can need a moment to expose /json after the forward appears.
         targets = None
         last_exc = None
         for _ in range(10):
@@ -140,16 +139,8 @@ def main() -> int:
             t for t in targets
             if isinstance(t, dict)
             and t.get("type") == "page"
-            and "192.168.4.53:8765" in str(t.get("url", ""))
+            and str(t.get("title", "")) == "GF Browser Qualification"
         ]
-        if not candidates:
-            # Generic fallback so the public script contains no dependency on one client LAN.
-            candidates = [
-                t for t in targets
-                if isinstance(t, dict)
-                and t.get("type") == "page"
-                and str(t.get("title", "")) == "GF Browser Qualification"
-            ]
         if not candidates:
             pages = [t for t in targets if isinstance(t, dict) and t.get("type") == "page"]
             summary = [{"title": p.get("title"), "url": p.get("url")} for p in pages]

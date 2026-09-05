@@ -1,7 +1,7 @@
 {
   "project": "TikTok Automation / GenFarmer",
   "visibility": "public-source-private-client-config",
-  "phase": "live-node-schema-learning",
+  "phase": "chrome-qualification",
   "verified_capabilities": [
     "20 Android devices visible simultaneously to ADB",
     "safe Device #1 Settings smoke workflow passed with local evidence",
@@ -18,8 +18,12 @@
     "exact private raw lab flow captured locally plus privacy-safe template inventory",
     "full live settings schema matrix executed for all 62 actions",
     "targeted one-setting before/after differential probe implemented",
+    "Chrome qualification fixture/preflight/audit tooling implemented",
     "GenFarmer fingerprint rotation previously proven",
     "XProxy service reachable and first-position proxy listeners available"
+  ],
+  "operator_reported_capabilities": [
+    "one XProxy position is now live/working; independent end-to-end proxy qualification is still pending"
   ],
   "current_findings": [
     "node.type is a rendering family and data.action is the semantic discriminator for serialized action nodes",
@@ -28,22 +32,25 @@
     "GroupNode is not present as a serialized data.action despite the exhaustive standalone-node capture and remains classified as editor-structural",
     "the previously ambiguous actions are exact from live evidence: H.HTTP->HTTP, H.LOG->Log, H.RANDOM->Random, H.STOP->Stop",
     "the live schema matrix confirms the common custom-node runtime option set is exactly breakpoint, disabled, nodeLog, nodeSleep, nodeTimeout, timeoutAdbReconnect and timeoutNextNode",
-    "nearly every untouched configurable custom node serializes only those seven common runtime options; action-specific settings are therefore lazy/non-default and must be learned after an actual UI configuration change",
+    "nearly every untouched configurable custom node serializes only those seven common runtime options; action-specific settings are lazy/non-default and must be learned after an actual UI configuration change",
     "ContextMenu uniquely exposes options.casePaths by default; Loop has family loop with data.startLoopNode and no options; Comment and Variables are helper-family nodes; Start is input-family and Stop is output-family",
     "source-side default/settings mining reached diminishing returns; exact live templates plus targeted one-setting differentials are now authoritative",
-    "the private exact 62-node flow is the cloning source while shareable tools expose only field/type shapes and safe defaults"
+    "the private exact 62-node flow is the cloning source while shareable tools expose only field/type shapes and safe defaults",
+    "Chrome qualification is the current integration lane before TikTok-specific workflows",
+    "proxy qualification will be run immediately after direct Chrome qualification so automation and network failures remain separable"
   ],
   "blockers": [
     "action-specific non-default settings, enums and selector variants are not yet proven for configurable actions because untouched defaults omit them",
     "success/failure/branch edge semantics remain incomplete because the full catalog flow intentionally has zero edges",
-    "first cellular modem/SIM does not yet expose a verified mobile public IP"
+    "the reported live XProxy position still needs an end-to-end HTTP(S) egress check and external-IP evidence before proxy-required workflows are enabled"
   ],
   "next": [
-    "use scripts/genfarmer_setting_probe.py before/after around exactly one UI change on one node",
-    "start with high-value TikTok-control actions such as Touch, TypeText, Swipe, StartApp, ElementExists and Press",
-    "repeat targeted differentials for selector modes, app fields, gestures, input and wait/range semantics",
-    "extend TemplateRegistry loading for the exact private lab flow and verify all 62 live semantic kinds are cloneable",
-    "create a separate tiny routing lab to learn success, failure and branch edges",
-    "prove a harmless Python-authored flow on Device #1"
+    "run scripts/chrome_device_preflight.py on Device #1",
+    "start the deterministic Chrome fixture server and verify the Android browser opens it",
+    "build and audit the GF Lab - Chrome Qualification flow",
+    "qualify the reported live XProxy position with a real request through the proxy and record the external IP only in ignored evidence",
+    "run the same browser fixture through the proxy path after direct browser qualification passes",
+    "then begin the authorized TikTok qualification workflow",
+    "continue targeted setting differentials only for nodes the Chrome/TikTok workflows actually require"
   ]
 }

@@ -10,8 +10,8 @@ from genfarmer_automation.palette_catalog_261 import (
 
 def test_palette_row_count_and_unresolved_count():
     assert len(PALETTE_261) == 60
-    assert len(RESOLVED_ACTIONS_261) == 57
-    assert len(UNRESOLVED_PALETTE_261) == 3
+    assert len(RESOLVED_ACTIONS_261) == 60
+    assert len(UNRESOLVED_PALETTE_261) == 0
 
 
 def test_labels_and_constants_are_unique():
@@ -29,14 +29,14 @@ def test_known_live_anchors_and_special_nodes():
     assert by_label("Sleep").action == "Pause"
     assert by_label("Screenshot").action == "Screenshot"
     assert by_label("HTTP").action == "HTTP"
-    assert by_label("HTTP").provenance == "live-flow-anchor"
+    assert by_label("Log").action == "Log"
+    assert by_label("Random").action == "Random"
+    assert by_label("Stop").action == "Stop"
+    for label in ("HTTP", "Log", "Random", "Stop"):
+        assert by_label(label).provenance == "live-flow-anchor"
     assert by_action("TypeText").label == "Type text"
     assert SPECIAL_LIVE_NODES_261 == ("Start", "Variables", "ContextMenu")
 
 
-def test_only_expected_source_rows_are_unresolved():
-    assert {(item.label, item.constant) for item in UNRESOLVED_PALETTE_261} == {
-        ("Log", "H.LOG"),
-        ("Random", "H.RANDOM"),
-        ("Stop", "H.STOP"),
-    }
+def test_no_palette_rows_remain_unresolved():
+    assert UNRESOLVED_PALETTE_261 == ()

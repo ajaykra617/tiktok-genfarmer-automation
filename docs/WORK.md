@@ -37,19 +37,22 @@ Learn the GenFarmer 2.6.1 `script.flow` language exhaustively enough to create a
 - [x] Resolve 56/60 palette actions with explicit provenance: 55 `unique-source` plus live `Screenshot` anchor.
 - [x] Validate all four live-known resolver anchors: `ADB -> Adb`, `DEEPSEEK -> DeepSeek`, `PAUSE -> Pause`, `SCREENSHOT -> Screenshot`.
 - [x] Keep ambiguous `HTTP`, `LOG`, `RANDOM`, and `STOP` unresolved; V2 correctly rejected conflicting candidate literals and accepted no canonical map.
-- [x] Add `genfarmer_node_factory_ast.py` to search exact palette constants for non-palette node-construction/default-schema objects, switch branches and computed handler maps.
+- [x] Run `genfarmer_node_factory_ast.py` across 199 renderer assets.
+- [x] Confirm source factory/default mining produced `0/60` usable candidates at score >=20; only sparse switch evidence exists for Case Path, Comment, Loop, Multi Element exists and Stop.
+- [x] Adopt stopping rule: do not spend more time broad-mining minified renderer code for default node payloads unless a new high-confidence source path appears.
+- [x] Add versioned `palette_catalog_261.py` containing all 60 source-proven rows, 56 resolved actions and four explicit unresolved rows.
+- [x] Add GET-only `genfarmer_lab_catalog_audit.py` to measure live template coverage and report privacy-safe data/option field-type shapes.
 
 ## In progress
 
-- [ ] Run `scripts/genfarmer_node_factory_ast.py` and determine how many actions expose source-side default `data/options` construction shapes.
-- [ ] Validate factory/default candidates against live Adb/Pause/Screenshot option-path shapes.
-- [ ] Build the confidence-ranked label -> source constant -> serialized `data.action` catalog with 56 resolved and 4 explicitly unresolved rows.
-- [ ] Use source factory/default evidence to reduce manual Node Catalog work; do not fabricate exact templates from source alone.
-- [ ] Resolve `HTTP`, `LOG`, `RANDOM`, and `STOP` from live saved nodes if source remains ambiguous.
-- [ ] Download the official `GenFarmer.postman_collection.json` to ignored local evidence and run `scripts/genfarmer_postman_analyze.py`.
-- [ ] Create `GF Lab - Node Catalog` only for actions/settings that still lack exact saved templates after source mining.
-- [ ] Run structural + semantic + routing learners against the Node Catalog app.
+- [ ] Create a dedicated GenFarmer Automation App named `GF Lab - Node Catalog`.
+- [ ] Add source-proven palette nodes to the lab app in manageable batches, save, and run `scripts/genfarmer_lab_catalog_audit.py` after each batch.
+- [ ] Capture exact GenFarmer-generated `script.flow` templates for all 60 palette actions without fabricating payloads.
+- [ ] Resolve `HTTP`, `LOG`, `RANDOM`, and `STOP` from live saved nodes.
+- [ ] Run structural + semantic + routing learners against the lab app as coverage grows.
+- [ ] Populate the local-only template registry from exact private raw-flow evidence.
 - [ ] Learn one harmless failure route and every ambiguous option with one-field-at-a-time snapshots/diffs.
+- [ ] Download the official `GenFarmer.postman_collection.json` to ignored local evidence and run `scripts/genfarmer_postman_analyze.py`.
 - [ ] Prove exact round-trip equality for the lab app.
 - [ ] Perform one harmless Python-generated edit and verify GenFarmer UI reloads it correctly.
 - [ ] Generate a harmless flow from verified templates and execute it on Device #1.
@@ -60,7 +63,7 @@ Learn the GenFarmer 2.6.1 `script.flow` language exhaustively enough to create a
 - **AST palette-registry row:** renderer object directly contains `label`, `action` and `icon` properties; strong source evidence for palette membership/action constant.
 - **Source-resolved literal:** source action constant is mapped to exactly one string literal by structural evidence.
 - **Live-flow anchor:** exact saved `script.flow` resolves an otherwise source-ambiguous constant.
-- **Factory/default candidate:** AST object or branch anchored to an exact palette constant exposes field/type shape, but is not an exact saved template until live round-trip evidence confirms it.
+- **Lab-captured template:** exact GenFarmer-generated node object exists in the dedicated lab flow and can be loaded into the private template registry.
 - **Ambiguous token:** useful lead only; not promoted to the authoring registry.
 
 ## Specific semantics still to learn

@@ -1,12 +1,14 @@
 from genfarmer_automation.browse_one import (
     BrowseOneError,
     EXPECTED_BROWSE_ONE_ROUTE,
+    control_window_is_safe,
     created_run_binding,
     exact_bound_device_id,
     validate_browse_one_flow,
 )
 from genfarmer_automation.flow import FlowDocument
 from genfarmer_automation.run_binding import RunBinding
+from genfarmer_automation.screen_transition import TransitionDecision, TransitionReport
 
 
 def node(node_id, action):
@@ -31,6 +33,22 @@ def binding(*device_ids):
         created_at="2026-09-08T01:00:00Z",
         updated_at=None,
         device_ids=tuple(device_ids),
+    )
+
+
+def transition(decision, *, stable_ratio=1.0, changed_ratio=0.0):
+    return TransitionReport(
+        decision=decision,
+        total_points=100,
+        baseline_stable_points=round(100 * stable_ratio),
+        baseline_stable_ratio=stable_ratio,
+        changed_points=round(100 * stable_ratio * changed_ratio),
+        changed_ratio_of_stable=changed_ratio,
+        changed_cells=0,
+        occupied_cells=24,
+        stable_range_threshold=16,
+        changed_delta_threshold=40,
+        reason="test",
     )
 
 
@@ -74,3 +92,18 @@ def test_created_run_binding_requires_single_matching_record():
 def test_created_run_binding_rejects_wrong_task():
     payload = {"id": "run-new", "appId": "app-1", "taskId": "other"}
     assert created_run_binding(payload, app_id="app-1", task_id="task-1") is None
+
+
+def test_control_window_accepts_only_trustworthy_quiet_baseline():
+    report = transition(TransitionDecision.INCONCLUSIVE_CHANGE, stable_ratio=0.97, changed_ratio=0.0)
+    assert control_window_is_safe(report) is True
+
+
+def test_control_window_rejects_unstable_baseline_even_without_proven_change():
+    report = transition(TransitionDecision.INCONCLUSIVE_BASELINE, stable_ratio=0.034, changed_ratio=0.0)
+    assert control_window_is_safe(report) is False
+
+
+def test_control_window_rejects_no_action_transition():
+    report = transition(TransitionDecision.PROVEN_CHANGED, stable_ratio=0.97, changed_ratio=0.40)
+    assert control_window_is_safe(report) is False

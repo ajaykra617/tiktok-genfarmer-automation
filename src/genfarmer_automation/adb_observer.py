@@ -15,6 +15,8 @@ import re
 import subprocess
 from typing import Iterable
 
+from .screen_state import RawScreenFrame, parse_android_raw_screencap
+
 TIKTOK_PACKAGE = "com.zhiliaoapp.musically"
 
 
@@ -145,3 +147,8 @@ class AdbObserver:
             _adb(self.device, ["exec-out", "screencap", "-p"], timeout=self.timeout, binary=True)
         )
         return output
+
+    def capture_raw_frame(self) -> RawScreenFrame:
+        """Capture one raw RGBA frame without mutating the device."""
+        raw = _adb(self.device, ["exec-out", "screencap"], timeout=self.timeout, binary=True)
+        return parse_android_raw_screencap(raw)

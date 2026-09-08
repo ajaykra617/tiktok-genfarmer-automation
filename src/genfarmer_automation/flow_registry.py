@@ -18,6 +18,8 @@ import json
 from pathlib import Path
 from typing import Any, Mapping
 
+from .flow import find_flow
+
 
 class TemplateRegistryError(ValueError):
     """Raised when a template corpus is malformed or a template is missing."""
@@ -110,21 +112,41 @@ class TemplateRegistry:
 
     @classmethod
     def from_raw_corpus(cls, path: str | Path) -> "TemplateRegistry":
+        """Load templates from either a learned corpus or one exact private flow.
+
+        Older tooling writes a list of app records with ``flow`` members. The
+        exhaustive live-catalog tooling writes a direct ``script.flow`` object
+        under ignored evidence. Supporting both lets later automation clone only
+        exact GenFarmer-generated nodes without copying private values into Git.
+        """
+
         corpus_path = Path(path)
         try:
             payload = json.loads(corpus_path.read_text(encoding="utf-8"))
         except (OSError, json.JSONDecodeError) as exc:
             raise TemplateRegistryError(f"cannot read raw flow corpus: {exc}") from exc
-        if not isinstance(payload, list):
-            raise TemplateRegistryError("raw corpus must be a list")
+
+        flows: list[Mapping[str, Any]] = []
+        if isinstance(payload, list):
+            for app in payload:
+                if not isinstance(app, Mapping):
+                    continue
+                flow = app.get("flow")
+                if isinstance(flow, Mapping):
+                    flows.append(flow)
+                    continue
+                discovered = find_flow(app)
+                if isinstance(discovered, Mapping):
+                    flows.append(discovered)
+        elif isinstance(payload, Mapping):
+            discovered = find_flow(payload)
+            if isinstance(discovered, Mapping):
+                flows.append(discovered)
+        else:
+            raise TemplateRegistryError("raw corpus must be a list, app payload, or direct flow object")
 
         templates: list[NodeTemplate] = []
-        for app in payload:
-            if not isinstance(app, Mapping):
-                continue
-            flow = app.get("flow")
-            if not isinstance(flow, Mapping):
-                continue
+        for flow in flows:
             nodes = flow.get("nodes")
             if not isinstance(nodes, list):
                 continue

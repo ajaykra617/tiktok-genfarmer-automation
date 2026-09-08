@@ -22,6 +22,10 @@ def iter_dicts(value: Any) -> Iterable[dict[str, Any]]:
 
 
 def _scalar(value: Any) -> str | None:
+    # bool is a subclass of int in Python. Treating True/False as identifiers
+    # caused metadata such as devices.enabled=True to leak into device_ids.
+    if isinstance(value, bool):
+        return None
     if isinstance(value, (str, int)) and str(value):
         return str(value)
     return None

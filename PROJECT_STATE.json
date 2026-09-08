@@ -30,13 +30,18 @@
     "a TikTok Android notification-permission dialog was observed during that run, proving that node execution alone can produce false success when an overlay intercepts app actions",
     "a read-only ADB observer now classifies foreground package/activity and known coarse interrupt packages without mutating the device",
     "a bounded observe-act-verify-recover supervisor now exists with explicit preconditions, postconditions, local retry budget, recovery budget and hard-deadline support",
-    "a read-only tiktok_resilience_probe.py command now captures local evidence and fails closed on known interrupts or unexpected foreground state",
-    "the high-level AutomationController now exposes coarse observation and verified-module supervision primitives",
+    "the resilience unit tests passed on the Windows lab: 8 passed",
+    "the live resilience probe correctly classified Device #1 on the launcher as NOT_READY_FOREGROUND with no interrupt",
+    "a bounded ADB recovery action helper now exists for explicit authorized component relaunch only",
+    "TikTok foreground planning now distinguishes ready, needs-launch, blocked-interrupt and device-unavailable states",
+    "a dry-run-by-default tiktok_ensure_foreground.py tool now supports one explicit TikTok relaunch and requires fresh post-launch observation before reporting success",
+    "the high-level AutomationController exposes coarse observation, TikTok foreground recovery and verified-module supervision primitives",
     "GenFarmer fingerprint rotation previously proven",
     "XProxy service and first-position listeners are reachable"
   ],
   "operator_reported_capabilities": [
     "TikTok is installed and available on Device #1",
+    "the notification permission prompt was manually answered on Device #1 and may not recur on that device unless app/permission state changes",
     "one XProxy position is live/working; independent end-to-end proxy qualification is still pending"
   ],
   "current_findings": [
@@ -45,8 +50,10 @@
     "the preferred architecture is compiler-style verified GenFarmer node templates plus Python graph assembly, with Python supervising short modules rather than trusting one long linear graph",
     "GenFarmer may normalize non-runtime editor fields after PUT, so deployment verification compares runtime semantics rather than requiring byte-for-byte flow identity",
     "the live warm-up graph currently matches compiled node actions, options, routing, source/target edges and handles",
-    "the first live run exposed a notification permission prompt while Swipe nodes continued, so a successful GenFarmer node log is not sufficient evidence that the intended TikTok state changed",
+    "a successful GenFarmer node log is not sufficient evidence that the intended TikTok state changed",
     "all meaningful modules must use observe -> interrupt classification -> precondition -> action -> postcondition -> checkpoint/recovery",
+    "the notification prompt may no longer be reproducible on Device #1, but the fail-closed interrupt classifier must remain because other devices or reset app state can surface permission dialogs later",
+    "coarse foreground recovery is safe to automate because the TikTok package/component was explicitly qualified and the recovery performs no UI taps",
     "unknown or challenge states must fail closed; no blind taps or captcha/checkpoint bypass are allowed",
     "production selectors must prefer resource-id/accessibility/content-desc/text/class/relative-XPath and must never rely on visually guessed coordinates",
     "standalone Android uiautomator dump is killed with exit 137 in the active GenFarmer/device session, while ADB itself remains healthy",
@@ -56,18 +63,18 @@
     "public source must not contain client IPs, credentials, raw selectors tied to private accounts, proxy URLs or account identifiers"
   ],
   "blockers": [
-    "the Android notification permission interrupt still needs one verified selector/action policy before it can be auto-handled",
     "selector-level feed precondition and postcondition checks are not yet captured, so browse_one cannot yet prove that a swipe changed the intended TikTok feed state",
     "stable native TikTok selectors for Home/FYP, search/discover, profile and content containers are not yet captured for richer passive warm-up modules",
+    "the Android notification permission handler remains unqualified for automatic dismissal; until needed it must continue to fail closed rather than guess",
     "boost explore/publish flow has not yet been qualified",
     "failure/branch edge semantics remain incomplete",
     "the reported live XProxy position still needs an end-to-end HTTP(S) egress check before proxy-required workflows are enabled"
   ],
   "next": [
-    "run scripts/tiktok_resilience_probe.py while TikTok is foreground and again when the notification permission dialog is visible to confirm coarse interrupt classification on Device #1",
-    "capture the notification dialog deny/dismiss control using GenFarmer's native inspector and save one verified selector/action variant",
-    "build ensure_ready as a short reusable module that handles only verified known interrupts and stops on unknown state",
-    "capture feed-anchor and next-item evidence sufficient to implement browse_one precondition/postcondition validation",
+    "run tests/test_tiktok_runtime.py together with the existing resilience tests",
+    "run scripts/tiktok_ensure_foreground.py in dry-run mode while Device #1 is on the launcher; confirm the plan is needs_launch",
+    "rerun scripts/tiktok_ensure_foreground.py --apply and confirm TikTok foreground is proven after exactly one bounded relaunch",
+    "once coarse recovery is green, capture feed-anchor evidence sufficient to implement browse_one precondition/postcondition validation",
     "qualify repeated browse_one cycles under the Python supervisor with bounded retries and evidence",
     "qualify XProxy end-to-end before enabling any proxy-required TikTok workflow",
     "after resilience gates are green, extend passive warm-up with profile/comment/niche-search modules"

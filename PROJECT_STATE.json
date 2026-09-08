@@ -22,6 +22,7 @@
     "lossless .genfarm file helpers and a privacy-conscious local export inspector are implemented",
     "private live-template registry can load both learned corpus files and direct exact flow.raw.json captures",
     "Python warm-up node-adder implemented with dry-run default, explicit --apply, exact live-template cloning, no existing-edge mutation and post-PUT verification",
+    "offline Python TikTok warm-up compiler implemented: it rebuilds a clean passive StartApp -> Pause/Swipe cycles -> Screenshot -> StopApp -> Stop graph from the known-good export and exact local node templates",
     "GenFarmer fingerprint rotation previously proven",
     "XProxy service and first-position listeners are reachable"
   ],
@@ -35,6 +36,8 @@
     "the exported .genfarm format gives us a second programmable path besides the Local API: Python can clone/edit complete app files offline, preserve unknown fields and emit new importable variants",
     "the preferred architecture is now compiler-style: keep verified GenFarmer-generated node templates, assemble app variants with Python, then either import the resulting .genfarm file or update the live app through the documented API",
     "the green TikTok base app is the protected template; new action nodes should be cloned by Python from exact GenFarmer-generated templates rather than manually recreated or schema-guessed",
+    "the first compiler-generated warm-up scope is passive feed browsing only; action-specific Swipe options may be supplied from one verified local options JSON after the operator configures Swipe once",
+    "the compiler creates exact nodes, IDs, readable positions, success routing and observed edge-handle shapes in Python, validates the graph, and writes a new .genfarm file without touching the live GenFarmer app",
     "new action-specific settings still need one live observation each before Python should synthesize them automatically",
     "production selectors must prefer resource-id/accessibility/content-desc/text/class/relative-XPath and must never rely on visually guessed coordinates",
     "standalone Android uiautomator dump is killed with exit 137 in the active GenFarmer/device session, while ADB itself remains healthy",
@@ -44,18 +47,18 @@
     "public source must not contain client IPs, credentials, raw selectors tied to private accounts, proxy URLs or account identifiers"
   ],
   "blockers": [
-    "stable native TikTok selectors for Home/FYP, search/discover, profile and content containers are not yet captured",
-    "ElementExists and Swipe action-specific settings/edge semantics still need one live configuration capture",
+    "Swipe action-specific settings still need one live configuration capture before the compiled passive warm-up is runtime-ready",
+    "stable native TikTok selectors for Home/FYP, search/discover, profile and content containers are not yet captured for the richer passive warm-up modules",
     "the exact GenFarmer import semantics for copied .genfarm identity fields should be qualified on a disposable lab copy before relying on file import for unattended deployment",
     "boost explore/publish flow has not yet been qualified",
     "failure/branch edge semantics remain incomplete",
     "the reported live XProxy position still needs an end-to-end HTTP(S) egress check before proxy-required workflows are enabled"
   ],
   "next": [
-    "use exported .genfarm files as lossless fixtures and inspect them with scripts/genfarm_inspect.py",
-    "qualify one disposable export-edit-import round trip so we know whether copied id/userId/timestamp fields must be retained or cleared for a new app",
-    "continue learning ElementExists and Swipe once, then have Python compile those verified settings into warm-up app variants automatically",
-    "qualify a bounded read-only warm-up browse before adding any write or engagement action",
+    "run scripts/genfarm_build_tiktok_warmup.py against the known-good TikTok .genfarm export to generate a passive three-Swipe warm-up file entirely in Python",
+    "open the generated file in GenFarmer only to configure/verify Swipe once, then save/export the verified Swipe options for reuse by the compiler",
+    "rerun the compiler with --swipe-options so every Swipe is fully configured by Python and qualify the generated passive warm-up on Device #1",
+    "after native selectors are captured, extend the compiler with passive profile/comment/niche-search modules while keeping engagement writes out of the warm-up qualification lane",
     "after the test account/device is explicitly marked ready, qualify Boost Explore and an approved publish path with idempotency/content-history checks",
     "add structured action logging and only then prepare scheduler integration and scale gates"
   ]

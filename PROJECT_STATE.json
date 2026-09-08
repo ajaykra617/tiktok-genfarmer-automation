@@ -14,11 +14,14 @@
     "full live settings schema matrix executed for all 62 captured actions",
     "Chrome qualification proved GenFarmer StartApp/ADB/Pause/Screenshot/StopApp/Stop routing on Device #1",
     "Chrome fixture page visibly reached through a GenFarmer run on Device #1",
+    "TikTok package on Device #1 qualified as com.zhiliaoapp.musically",
+    "TikTok version qualified as 46.7.3 (versionCode 2024607030)",
+    "TikTok launcher qualified as com.zhiliaoapp.musically/com.ss.android.ugc.aweme.splash.SplashActivity",
     "GenFarmer fingerprint rotation previously proven",
     "XProxy service and first-position listeners are reachable"
   ],
   "operator_reported_capabilities": [
-    "TikTok is now installed on Device #1",
+    "TikTok is installed and available on Device #1",
     "one XProxy position is live/working; independent end-to-end proxy qualification is still pending"
   ],
   "current_findings": [
@@ -32,7 +35,6 @@
     "public source must not contain client IPs, credentials, raw selectors tied to private accounts, proxy URLs or account identifiers"
   ],
   "blockers": [
-    "exact TikTok package/version/launcher activity on Device #1 still needs read-only qualification",
     "stable native TikTok selectors for Home/FYP, search/discover, profile and content containers are not yet captured",
     "TikTok warm-up runtime primitives have not yet been qualified",
     "boost explore/publish flow has not yet been qualified",
@@ -40,10 +42,11 @@
     "the reported live XProxy position still needs an end-to-end HTTP(S) egress check before proxy-required workflows are enabled"
   ],
   "next": [
-    "run scripts/tiktok_device_probe.py on Device #1 to identify package/version/launcher activity",
+    "create GF Lab - TikTok Warmup Qualification and configure StartApp with com.zhiliaoapp.musically (launcher activity available if the node exposes an activity field)",
     "open TikTok on Device #1 and capture stable native selectors with GenFarmer inspector/selector tooling",
-    "create GF Lab - TikTok Warmup Qualification with StartApp -> known-element wait -> bounded feed browse -> screenshot -> StopApp -> Stop",
-    "qualify a read-only warm-up flow before adding any write or engagement action",
+    "build the first read-only flow as StartApp -> wait -> screenshot -> StopApp -> Stop to verify launch under GenFarmer",
+    "then add known-element wait plus bounded feed browse using stable selectors and Swipe",
+    "qualify the read-only warm-up flow before adding any write or engagement action",
     "after the test account/device is explicitly marked ready, qualify Boost Explore and an approved publish path with idempotency/content-history checks",
     "add structured action logging and only then prepare scheduler integration and scale gates"
   ]

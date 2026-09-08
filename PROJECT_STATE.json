@@ -17,6 +17,9 @@
     "TikTok package on Device #1 qualified as com.zhiliaoapp.musically",
     "TikTok version qualified as 46.7.3 (versionCode 2024607030)",
     "TikTok launcher qualified as com.zhiliaoapp.musically/com.ss.android.ugc.aweme.splash.SplashActivity",
+    "GF Lab - TikTok Warmup Qualification base lifecycle executed successfully through StartApp -> Pause -> Screenshot -> StopApp -> Stop on Device #1",
+    "private live-template registry can now load both learned corpus files and direct exact flow.raw.json captures",
+    "Python warm-up node-adder implemented with dry-run default, explicit --apply, exact live-template cloning, no existing-edge mutation and post-PUT verification",
     "GenFarmer fingerprint rotation previously proven",
     "XProxy service and first-position listeners are reachable"
   ],
@@ -27,6 +30,8 @@
   "current_findings": [
     "account creation/login/reset mode is explicitly out of scope for the current lane",
     "the active lane is TikTok warm-up plus boost qualification on one authorized test device/account",
+    "the green TikTok base app is now the protected template; new action nodes should be cloned by Python from exact GenFarmer-generated templates rather than manually recreated or schema-guessed",
+    "new nodes are initially added disconnected so the existing green route stays untouched while the operator configures each action once and we learn the exact serialized settings and edge-handle semantics",
     "production selectors must prefer resource-id/accessibility/content-desc/text/class/relative-XPath and must never rely on visually guessed coordinates",
     "standalone Android uiautomator dump is killed with exit 137 in the active GenFarmer/device session, while ADB itself remains healthy",
     "native selector qualification will therefore use GenFarmer's own inspector/selector capabilities first",
@@ -36,17 +41,17 @@
   ],
   "blockers": [
     "stable native TikTok selectors for Home/FYP, search/discover, profile and content containers are not yet captured",
-    "TikTok warm-up runtime primitives have not yet been qualified",
+    "ElementExists and Swipe action-specific settings/edge semantics still need one live configuration capture",
     "boost explore/publish flow has not yet been qualified",
     "failure/branch edge semantics remain incomplete",
     "the reported live XProxy position still needs an end-to-end HTTP(S) egress check before proxy-required workflows are enabled"
   ],
   "next": [
-    "create GF Lab - TikTok Warmup Qualification and configure StartApp with com.zhiliaoapp.musically (launcher activity available if the node exposes an activity field)",
-    "open TikTok on Device #1 and capture stable native selectors with GenFarmer inspector/selector tooling",
-    "build the first read-only flow as StartApp -> wait -> screenshot -> StopApp -> Stop to verify launch under GenFarmer",
-    "then add known-element wait plus bounded feed browse using stable selectors and Swipe",
-    "qualify the read-only warm-up flow before adding any write or engagement action",
+    "use scripts/genfarmer_tiktok_add_nodes.py in dry-run mode to plan exact-template ElementExists and Swipe nodes for GF Lab - TikTok Warmup Qualification",
+    "review the dry-run, then rerun with --apply to add the nodes without modifying the existing green route",
+    "configure ElementExists and Swipe once in GenFarmer using stable native TikTok selector/direction settings, connect them manually for the first qualification, and save",
+    "capture the resulting node/edge deltas so Python can reproduce both settings and routing automatically thereafter",
+    "qualify a bounded read-only warm-up browse before adding any write or engagement action",
     "after the test account/device is explicitly marked ready, qualify Boost Explore and an approved publish path with idempotency/content-history checks",
     "add structured action logging and only then prepare scheduler integration and scale gates"
   ]

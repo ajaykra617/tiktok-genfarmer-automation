@@ -25,6 +25,21 @@ def test_extracts_nested_run_binding_and_devices():
     assert values[0].device_ids == ("dev-a", "dev-b")
 
 
+def test_boolean_device_metadata_is_never_treated_as_identifier():
+    payload = {
+        "id": "run-1",
+        "appId": "app-1",
+        "taskId": "task-1",
+        "devices": {
+            "enabled": True,
+            "primary": False,
+            "list": [{"id": "dev-a", "enabled": True}],
+        },
+    }
+    value = extract_run_bindings(payload)[0]
+    assert value.device_ids == ("dev-a",)
+
+
 def test_ignores_unrelated_objects_without_app_and_task_ids():
     payload = {
         "data": [

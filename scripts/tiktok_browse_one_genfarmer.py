@@ -7,7 +7,8 @@ Dry-run by default.  ``--apply`` is allowed only when all of these gates pass:
 - a recent persisted run exposes the same task binding;
 - one GenFarmer device id exactly equals DEFAULT_DEVICE_ADB;
 - TikTok is foreground with no known interrupt;
-- no-action control drift is below the visual transition gate.
+- the no-action control window has enough stable baseline area to be trustworthy;
+- no-action control drift stays below the visual transition gate.
 
 The apply path creates a fresh run, executes it on exactly that one bound device,
 and reports success only if the post-action visual transition is conservatively
@@ -35,6 +36,7 @@ if str(SRC) not in sys.path:
 from genfarmer_automation.adb_observer import AdbObservationError, AdbObserver, InterruptKind  # noqa: E402
 from genfarmer_automation.browse_one import (  # noqa: E402
     BrowseOneError,
+    control_window_is_safe,
     created_run_binding,
     exact_bound_device_id,
     validate_browse_one_flow,
@@ -248,9 +250,17 @@ def main() -> int:
         control_frames = collect_frames(observer, args.frames, args.frame_interval)
         control = assess_visual_transition(before, control_frames)
         result["control"] = report_dict(control)
-        if control.decision is TransitionDecision.PROVEN_CHANGED:
-            result["status"] = "INCONCLUSIVE_CONTROL_DRIFT"
-            result["reason"] = "screen changed enough without an action; visual postcondition is unsafe for this sample"
+        result["control_window_safe"] = control_window_is_safe(control)
+        if not control_window_is_safe(control):
+            if control.decision is TransitionDecision.PROVEN_CHANGED:
+                result["status"] = "INCONCLUSIVE_CONTROL_DRIFT"
+                result["reason"] = "screen changed enough without an action; visual postcondition is unsafe for this sample"
+            else:
+                result["status"] = "INCONCLUSIVE_CONTROL_BASELINE"
+                result["reason"] = (
+                    "no-action control baseline did not contain enough temporally stable screen area; "
+                    "refusing to mutate because later visual verification would be untrustworthy"
+                )
             raise RuntimeError(result["reason"])
 
         if not args.apply:
@@ -318,6 +328,7 @@ def main() -> int:
         print(f"Exact ADB device match:  {'YES' if result.get('exact_adb_device_match') else 'NO'}")
         print(f"Control stable ratio:    {control.baseline_stable_ratio * 100:.1f}%")
         print(f"Control changed ratio:   {control.changed_ratio_of_stable * 100:.1f}%")
+        print(f"Control decision:        {control.decision.value}")
         if action_report is not None:
             print(f"Action changed ratio:    {action_report.changed_ratio_of_stable * 100:.1f}%")
             print(f"Changed cells:           {action_report.changed_cells}/{action_report.occupied_cells}")

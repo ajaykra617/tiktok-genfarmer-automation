@@ -1,7 +1,7 @@
 {
   "project": "TikTok Automation / GenFarmer",
   "visibility": "public-source-private-client-config",
-  "phase": "tiktok-warmup-runtime-qualification",
+  "phase": "tiktok-warmup-resilience-qualification",
   "verified_capabilities": [
     "20 Android devices visible simultaneously to ADB",
     "safe Device #1 Settings smoke workflow passed with local evidence",
@@ -26,6 +26,12 @@
     "the compiled READY flow was PUT into the intended live GenFarmer app using the preserved app identity",
     "post-PUT live verification found 14 nodes and 11 edges with runtime-semantic match YES",
     "GenFarmer normalization was limited to non-runtime editor position type differences in the observed verification sample",
+    "the first live compiled warm-up run visibly executed on Device #1",
+    "a TikTok Android notification-permission dialog was observed during that run, proving that node execution alone can produce false success when an overlay intercepts app actions",
+    "a read-only ADB observer now classifies foreground package/activity and known coarse interrupt packages without mutating the device",
+    "a bounded observe-act-verify-recover supervisor now exists with explicit preconditions, postconditions, local retry budget, recovery budget and hard-deadline support",
+    "a read-only tiktok_resilience_probe.py command now captures local evidence and fails closed on known interrupts or unexpected foreground state",
+    "the high-level AutomationController now exposes coarse observation and verified-module supervision primitives",
     "GenFarmer fingerprint rotation previously proven",
     "XProxy service and first-position listeners are reachable"
   ],
@@ -36,10 +42,12 @@
   "current_findings": [
     "account creation/login/reset mode is explicitly out of scope for the current lane",
     "the active lane is TikTok warm-up plus boost qualification on one authorized test device/account",
-    "the preferred architecture is compiler-style: verified GenFarmer-generated node templates plus Python graph assembly, followed by documented Local API update for live execution",
-    "GenFarmer may normalize non-runtime editor fields after PUT, so deployment verification must compare runtime semantics rather than require byte-for-byte flow identity",
+    "the preferred architecture is compiler-style verified GenFarmer node templates plus Python graph assembly, with Python supervising short modules rather than trusting one long linear graph",
+    "GenFarmer may normalize non-runtime editor fields after PUT, so deployment verification compares runtime semantics rather than requiring byte-for-byte flow identity",
     "the live warm-up graph currently matches compiled node actions, options, routing, source/target edges and handles",
-    "the current READY warm-up is passive browsing only and contains no like/follow/reply/DM/account actions",
+    "the first live run exposed a notification permission prompt while Swipe nodes continued, so a successful GenFarmer node log is not sufficient evidence that the intended TikTok state changed",
+    "all meaningful modules must use observe -> interrupt classification -> precondition -> action -> postcondition -> checkpoint/recovery",
+    "unknown or challenge states must fail closed; no blind taps or captcha/checkpoint bypass are allowed",
     "production selectors must prefer resource-id/accessibility/content-desc/text/class/relative-XPath and must never rely on visually guessed coordinates",
     "standalone Android uiautomator dump is killed with exit 137 in the active GenFarmer/device session, while ADB itself remains healthy",
     "native selector qualification will therefore use GenFarmer's own inspector/selector capabilities first",
@@ -48,18 +56,20 @@
     "public source must not contain client IPs, credentials, raw selectors tied to private accounts, proxy URLs or account identifiers"
   ],
   "blockers": [
-    "the live compiled passive three-Swipe warm-up still needs an end-to-end execution run on Device #1",
+    "the Android notification permission interrupt still needs one verified selector/action policy before it can be auto-handled",
+    "selector-level feed precondition and postcondition checks are not yet captured, so browse_one cannot yet prove that a swipe changed the intended TikTok feed state",
     "stable native TikTok selectors for Home/FYP, search/discover, profile and content containers are not yet captured for richer passive warm-up modules",
     "boost explore/publish flow has not yet been qualified",
     "failure/branch edge semantics remain incomplete",
     "the reported live XProxy position still needs an end-to-end HTTP(S) egress check before proxy-required workflows are enabled"
   ],
   "next": [
-    "run the currently deployed compiled warm-up on Device #1 and confirm TikTok launch, three visible upward feed swipes, the configured pauses, screenshot, clean StopApp and final Stop",
-    "repeat the passive run several times after the first green execution to establish basic reliability",
-    "capture stable native TikTok selectors and extend the compiler with passive profile/comment/niche-search modules",
+    "run scripts/tiktok_resilience_probe.py while TikTok is foreground and again when the notification permission dialog is visible to confirm coarse interrupt classification on Device #1",
+    "capture the notification dialog deny/dismiss control using GenFarmer's native inspector and save one verified selector/action variant",
+    "build ensure_ready as a short reusable module that handles only verified known interrupts and stops on unknown state",
+    "capture feed-anchor and next-item evidence sufficient to implement browse_one precondition/postcondition validation",
+    "qualify repeated browse_one cycles under the Python supervisor with bounded retries and evidence",
     "qualify XProxy end-to-end before enabling any proxy-required TikTok workflow",
-    "after the test account/device is explicitly marked ready, qualify Boost Explore and an approved publish path with idempotency/content-history checks",
-    "add structured action logging and only then prepare scheduler integration and scale gates"
+    "after resilience gates are green, extend passive warm-up with profile/comment/niche-search modules"
   ]
 }

@@ -1,7 +1,7 @@
 {
   "project": "TikTok Automation / GenFarmer",
   "visibility": "public-source-private-client-config",
-  "phase": "tiktok-warmup-boost-qualification",
+  "phase": "tiktok-warmup-runtime-qualification",
   "verified_capabilities": [
     "20 Android devices visible simultaneously to ADB",
     "safe Device #1 Settings smoke workflow passed with local evidence",
@@ -13,19 +13,19 @@
     "all 59 standalone palette action-node rows plus Start, Variables and ContextMenu are represented by exact saved live templates",
     "full live settings schema matrix executed for all 62 captured actions",
     "Chrome qualification proved GenFarmer StartApp/ADB/Pause/Screenshot/StopApp/Stop routing on Device #1",
-    "Chrome fixture page visibly reached through a GenFarmer run on Device #1",
     "TikTok package on Device #1 qualified as com.zhiliaoapp.musically",
     "TikTok version qualified as 46.7.3 (versionCode 2024607030)",
     "TikTok launcher qualified as com.zhiliaoapp.musically/com.ss.android.ugc.aweme.splash.SplashActivity",
-    "GF Lab - TikTok Warmup Qualification base lifecycle executed successfully through StartApp -> Pause -> Screenshot -> StopApp -> Stop on Device #1",
-    "a real exported .genfarm app was inspected and confirmed to be ordinary JSON containing complete app metadata plus script.flow, node options, positions and edges",
+    "GF Lab - TikTok Warmup Qualification base lifecycle executed successfully on Device #1",
+    "a real exported .genfarm app was confirmed to be ordinary JSON containing complete app metadata plus script.flow, node options, positions and edges",
     "lossless .genfarm file helpers and a privacy-conscious local export inspector are implemented",
-    "private live-template registry can load both learned corpus files and direct exact flow.raw.json captures",
     "offline Python TikTok warm-up compiler implemented",
-    "the default Swipe/Scroll node was opened in GenFarmer with Simple/Up already selected and its exact serialized options were extracted locally",
+    "the default Swipe/Scroll node was captured as Simple/Up and its exact serialized options were extracted locally",
     "the compiler-generated READY warm-up contains 14 nodes, 11 edges and a validated Start -> StartApp -> Pause -> Swipe -> Pause -> Swipe -> Pause -> Swipe -> Pause -> Screenshot -> StopApp -> Stop route",
     "the compiled READY warm-up passed local graph validation with zero warnings",
-    "safe Python live-apply tooling now exists to dry-run and then PUT a compiled .genfarm flow into the existing lab app with exact-name targeting, private before/after evidence and post-PUT flow-hash verification",
+    "the compiled READY flow was PUT into the intended live GenFarmer app using the preserved app identity",
+    "post-PUT live verification found 14 nodes and 11 edges with runtime-semantic match YES",
+    "GenFarmer normalization was limited to non-runtime editor position type differences in the observed verification sample",
     "GenFarmer fingerprint rotation previously proven",
     "XProxy service and first-position listeners are reachable"
   ],
@@ -36,9 +36,9 @@
   "current_findings": [
     "account creation/login/reset mode is explicitly out of scope for the current lane",
     "the active lane is TikTok warm-up plus boost qualification on one authorized test device/account",
-    "the preferred architecture is compiler-style: verified GenFarmer-generated node templates plus Python graph assembly, followed by either .genfarm import for visual review or documented Local API update for live execution",
-    "the green TikTok base app remains the protected template",
-    "Simple/Up is the observed default Swipe UI state and its exact serialized option object is now available locally for compiler reuse",
+    "the preferred architecture is compiler-style: verified GenFarmer-generated node templates plus Python graph assembly, followed by documented Local API update for live execution",
+    "GenFarmer may normalize non-runtime editor fields after PUT, so deployment verification must compare runtime semantics rather than require byte-for-byte flow identity",
+    "the live warm-up graph currently matches compiled node actions, options, routing, source/target edges and handles",
     "the current READY warm-up is passive browsing only and contains no like/follow/reply/DM/account actions",
     "production selectors must prefer resource-id/accessibility/content-desc/text/class/relative-XPath and must never rely on visually guessed coordinates",
     "standalone Android uiautomator dump is killed with exit 137 in the active GenFarmer/device session, while ADB itself remains healthy",
@@ -48,17 +48,17 @@
     "public source must not contain client IPs, credentials, raw selectors tied to private accounts, proxy URLs or account identifiers"
   ],
   "blockers": [
-    "the compiled passive three-Swipe warm-up still needs an end-to-end runtime qualification on Device #1",
+    "the live compiled passive three-Swipe warm-up still needs an end-to-end execution run on Device #1",
     "stable native TikTok selectors for Home/FYP, search/discover, profile and content containers are not yet captured for richer passive warm-up modules",
     "boost explore/publish flow has not yet been qualified",
     "failure/branch edge semantics remain incomplete",
     "the reported live XProxy position still needs an end-to-end HTTP(S) egress check before proxy-required workflows are enabled"
   ],
   "next": [
-    "dry-run scripts/genfarm_apply_to_app.py against the READY .genfarm and exact GF Lab - TikTok Warmup Qualification target",
-    "if the dry-run is correct, apply the compiled flow through the documented Local API and verify the post-PUT flow hash",
-    "run the resulting compiled passive warm-up on Device #1 and confirm three visible feed swipes plus clean Stop",
-    "after native selectors are captured, extend the compiler with passive profile/comment/niche-search modules",
+    "run the currently deployed compiled warm-up on Device #1 and confirm TikTok launch, three visible upward feed swipes, the configured pauses, screenshot, clean StopApp and final Stop",
+    "repeat the passive run several times after the first green execution to establish basic reliability",
+    "capture stable native TikTok selectors and extend the compiler with passive profile/comment/niche-search modules",
+    "qualify XProxy end-to-end before enabling any proxy-required TikTok workflow",
     "after the test account/device is explicitly marked ready, qualify Boost Explore and an approved publish path with idempotency/content-history checks",
     "add structured action logging and only then prepare scheduler integration and scale gates"
   ]

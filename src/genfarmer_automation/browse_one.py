@@ -1,9 +1,9 @@
 """Fail-closed helpers for one supervised passive TikTok browse action.
 
 The production executor is GenFarmer.  This module only validates that the
-compiled flow is the intentionally-small browse-one graph and that a previously
+compiled flow is the intentionally-small browse-one graph, that a previously
 observed GenFarmer device binding exactly matches the ADB target we intend to
-supervise.
+supervise, and that visual control evidence is strong enough before mutation.
 """
 from __future__ import annotations
 
@@ -11,6 +11,7 @@ from typing import Any, Mapping
 
 from .flow import FlowDocument
 from .run_binding import RunBinding, extract_run_bindings
+from .screen_transition import TransitionDecision, TransitionReport
 
 EXPECTED_BROWSE_ONE_ROUTE = (
     "Start",
@@ -121,3 +122,17 @@ def created_run_binding(payload: Any, *, app_id: str, task_id: str) -> RunBindin
     if len(matches) != 1:
         return None
     return matches[0]
+
+
+def control_window_is_safe(report: TransitionReport) -> bool:
+    """Return True only when the no-action control window is trustworthy and quiet.
+
+    ``assess_visual_transition`` has three outcomes.  For a control window, only
+    ``INCONCLUSIVE_CHANGE`` is acceptable: it means enough of the baseline was
+    temporally stable to evaluate, but no distributed transition was proven.
+
+    ``INCONCLUSIVE_BASELINE`` must *not* be treated as quiet.  It means there was
+    too little stable screen area to trust the comparison at all.  Allowing a
+    mutation in that state creates a false-ready risk.
+    """
+    return report.decision is TransitionDecision.INCONCLUSIVE_CHANGE

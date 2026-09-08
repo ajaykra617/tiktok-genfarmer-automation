@@ -10,6 +10,7 @@ from typing import Any, Callable
 
 from .adb_observer import AdbObserver, DeviceObservation
 from .resilience import ModuleResult, ResilientSupervisor, SupervisorPolicy
+from .tiktok_runtime import EnsureForegroundResult, TikTokRuntime
 
 
 class AutomationController:
@@ -20,6 +21,15 @@ class AutomationController:
     def observe_device(self, device: str | None = None) -> DeviceObservation:
         target = device or self.settings.default_device_adb
         return AdbObserver(target).observe()
+
+    def ensure_tiktok_foreground(self, device: str | None = None) -> EnsureForegroundResult:
+        """Restore only the coarse qualified TikTok foreground checkpoint.
+
+        This may perform one explicit app relaunch but never taps through UI or
+        dismisses interrupts. A fresh observation must prove TikTok foreground.
+        """
+        target = device or self.settings.default_device_adb
+        return TikTokRuntime(target).ensure_foreground()
 
     def run_verified_module(
         self,

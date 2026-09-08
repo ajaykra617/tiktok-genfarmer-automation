@@ -1,10 +1,11 @@
 #!/usr/bin/env python3
 """Apply a compiled .genfarm script to one existing GenFarmer app.
 
-Dry-run by default. The target app is selected by exact name (or --app-id), the
-compiled flow is validated locally, the current live script is preserved to
-private evidence, and --apply performs the documented PUT then re-reads the app
-to verify node/edge counts and exact flow hash.
+Dry-run by default. The target app is selected by explicit --app-id, by the
+compiled export's preserved app id when duplicate names exist, or by exact name
+when that name is unique. The compiled flow is validated locally, the current
+live script is preserved to private evidence, and --apply performs the
+documented PUT then re-reads the app to verify the exact flow hash.
 """
 from __future__ import annotations
 
@@ -82,9 +83,17 @@ def extract_app_records(value: Any) -> list[dict[str, Any]]:
     return records
 
 
-def select_app(client: GenFarmerClient, user_id: str | int | None, app_id: str | None, app_name: str) -> tuple[str, Any]:
+def select_app(
+    client: GenFarmerClient,
+    user_id: str | int | None,
+    app_id: str | None,
+    app_name: str,
+    *,
+    preferred_id: str | None = None,
+) -> tuple[str, Any, str]:
     if app_id:
-        return app_id, client.get_app(app_id)
+        return app_id, client.get_app(app_id), "explicit --app-id"
+
     matches: dict[str, dict[str, Any]] = {}
     for page in range(1, 21):
         payload = client.list_apps(user_id=user_id, page=page, limit=100)
@@ -94,12 +103,20 @@ def select_app(client: GenFarmerClient, user_id: str | int | None, app_id: str |
                 matches[str(record["id"])] = record
         if not records or len(records) < 100:
             break
+
     if not matches:
         raise GenFarmerError(f"app not found by exact name {app_name!r}")
+
+    if preferred_id and preferred_id in matches:
+        return preferred_id, client.get_app(preferred_id), "compiled export identity"
+
     if len(matches) != 1:
-        raise GenFarmerError(f"found {len(matches)} apps named {app_name!r}; pass --app-id")
-    app_id = next(iter(matches))
-    return app_id, client.get_app(app_id)
+        raise GenFarmerError(
+            f"found {len(matches)} apps named {app_name!r}, and the compiled export identity did not uniquely match one; pass --app-id"
+        )
+
+    selected = next(iter(matches))
+    return selected, client.get_app(selected), "unique exact name"
 
 
 def app_object(detail: Any, app_id: str) -> dict[str, Any]:
@@ -121,6 +138,14 @@ def coerce_user_id(value: Any) -> int:
     if isinstance(value, str) and value.isdigit():
         return int(value)
     raise GenFarmerError(f"cannot safely resolve numeric user id from {value!r}")
+
+
+def compiled_identity(doc: GenFarmDocument) -> str | None:
+    payload = doc.to_dict()
+    value = payload.get("id")
+    if isinstance(value, (str, int)) and str(value):
+        return str(value)
+    return None
 
 
 def main() -> int:
@@ -146,7 +171,14 @@ def main() -> int:
 
         read_client = GenFarmerClient(base_url, timeout=15.0, allow_mutations=False)
         current_user = discover_user_id(read_client.get_current_user())
-        app_id, detail = select_app(read_client, current_user, args.app_id, args.app_name)
+        preferred_id = compiled_identity(compiled)
+        app_id, detail, selection_basis = select_app(
+            read_client,
+            current_user,
+            args.app_id,
+            args.app_name,
+            preferred_id=preferred_id,
+        )
         live_app = app_object(detail, app_id)
         live_flow_raw = find_flow(live_app)
         if live_flow_raw is None:
@@ -164,6 +196,7 @@ def main() -> int:
             "timestamp_utc": datetime.now(timezone.utc).isoformat(),
             "mode": "apply" if args.apply else "dry-run",
             "app_name": args.app_name,
+            "selection_basis": selection_basis,
             "before_nodes": len(live_flow.nodes),
             "before_edges": len(live_flow.edges),
             "compiled_nodes": len(compiled_flow.nodes),
@@ -201,6 +234,7 @@ def main() -> int:
         print("GENFARM COMPILED FLOW APPLY")
         print("=" * 78)
         print(f"Target app: {args.app_name}")
+        print(f"Selection:  {selection_basis}")
         print(f"Compiled:   {args.compiled}")
         print(f"Current:    nodes={report['before_nodes']} edges={report['before_edges']}")
         print(f"Compiled:   nodes={report['compiled_nodes']} edges={report['compiled_edges']}")

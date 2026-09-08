@@ -1,7 +1,7 @@
 {
   "project": "TikTok Automation / GenFarmer",
   "visibility": "public-source-private-client-config",
-  "phase": "chrome-qualification-phase-b",
+  "phase": "tiktok-warmup-boost-qualification",
   "verified_capabilities": [
     "20 Android devices visible simultaneously to ADB",
     "safe Device #1 Settings smoke workflow passed with local evidence",
@@ -10,61 +10,41 @@
     "fail-closed documented-API Python client implemented",
     "lossless script.flow reader/editor, round-trip tooling and local-only TemplateRegistry implemented",
     "renderer AST source discovery recovered 60 exact label/action/icon registry rows",
-    "all 60 source action constants resolved with source or live-flow provenance",
-    "GF Lab - Node Catalog populated with every available standalone node",
-    "full lab capture contains 62 nodes and zero edges",
-    "all 59 standalone palette action-node rows are represented by exact saved data.action templates",
-    "the three special editor nodes Start, Variables and ContextMenu are also present",
-    "exact private raw lab flow captured locally plus privacy-safe template inventory",
-    "full live settings schema matrix executed for all 62 actions",
-    "targeted one-setting before/after differential probe implemented",
-    "Chrome qualification fixture/preflight/audit tooling implemented",
-    "Chrome package and HTTP VIEW handler resolved on Device #1",
-    "direct Android browser launch smoke succeeded and resolved to ChromeTabbedActivity",
-    "local deterministic Chrome fixture health check succeeded",
-    "GF Lab - Chrome Qualification Phase A flow saved and audited green with 9 nodes and 6 intended routing edges",
-    "Phase A routing verified as Start -> StartApp -> Adb -> Pause -> Screenshot -> StopApp -> Stop",
+    "all 59 standalone palette action-node rows plus Start, Variables and ContextMenu are represented by exact saved live templates",
+    "full live settings schema matrix executed for all 62 captured actions",
+    "Chrome qualification proved GenFarmer StartApp/ADB/Pause/Screenshot/StopApp/Stop routing on Device #1",
     "Chrome fixture page visibly reached through a GenFarmer run on Device #1",
-    "Chrome fixture upgraded with a same-origin server-side qualification beacon and /status counters",
     "GenFarmer fingerprint rotation previously proven",
-    "XProxy service reachable and first-position proxy listeners available"
+    "XProxy service and first-position listeners are reachable"
   ],
   "operator_reported_capabilities": [
-    "one XProxy position is now live/working; independent end-to-end proxy qualification is still pending",
-    "GF Lab - Chrome Qualification Phase A executed through the Stop node on Device #1",
-    "the Stop/termination step was temporarily disabled only to keep Chrome visible for screenshot/UI probing"
+    "TikTok is now installed on Device #1",
+    "one XProxy position is live/working; independent end-to-end proxy qualification is still pending"
   ],
   "current_findings": [
-    "node.type is a rendering family and data.action is the semantic discriminator for serialized action nodes",
-    "the renderer source registry has 60 rows but Group Node belongs to the separate Ht.* editor-structural namespace",
-    "the exhaustive live lab flow has 62 distinct data.action nodes: 59 ordinary palette action nodes plus Start, Variables and ContextMenu",
-    "GroupNode is not present as a serialized data.action despite the exhaustive standalone-node capture and remains classified as editor-structural",
-    "the previously ambiguous actions are exact from live evidence: H.HTTP->HTTP, H.LOG->Log, H.RANDOM->Random, H.STOP->Stop",
-    "the live schema matrix confirms the common custom-node runtime option set is exactly breakpoint, disabled, nodeLog, nodeSleep, nodeTimeout, timeoutAdbReconnect and timeoutNextNode",
-    "nearly every untouched configurable custom node serializes only those seven common runtime options; action-specific settings are therefore lazy/non-default and must be learned after an actual UI configuration change",
-    "ContextMenu uniquely exposes options.casePaths by default; Loop has family loop with data.startLoopNode and no options; Comment and Variables are helper-family nodes; Start is input-family and Stop is output-family",
-    "source-side default/settings mining reached diminishing returns; exact live templates plus targeted one-setting differentials are now authoritative",
-    "the private exact 62-node flow is the cloning source while shareable tools expose only field/type shapes and safe defaults",
-    "direct Chrome launch is independently proven outside GenFarmer",
-    "Phase A browser launch and success routing are operational on Device #1",
+    "account creation/login/reset mode is explicitly out of scope for the current lane",
+    "the active lane is TikTok warm-up plus boost qualification on one authorized test device/account",
+    "production selectors must prefer resource-id/accessibility/content-desc/text/class/relative-XPath and must never rely on visually guessed coordinates",
     "standalone Android uiautomator dump is killed with exit 137 in the active GenFarmer/device session, while ADB itself remains healthy",
-    "Chrome Phase B therefore uses coordinate Touch for the fixture and keeps native-selector qualification separate for TikTok",
-    "the fixture server now records only pass/submitted counters so Touch + TypeText + submit can be verified without relying on UIAutomator",
-    "proxy qualification follows the direct browser lane so automation and network failures remain separable"
+    "native selector qualification will therefore use GenFarmer's own inspector/selector capabilities first",
+    "the client requirements include saveable warm-up/boost presets, bounded sessions, exploration, posting, logging and scheduler/barrier behavior",
+    "client-prohibited actions include DMs, mass follow/unfollow, cross-account engagement, proxy rotation during login/upload and captcha/checkpoint bypass",
+    "public source must not contain client IPs, credentials, raw selectors tied to private accounts, proxy URLs or account identifiers"
   ],
   "blockers": [
-    "coordinate Touch and TypeText serialization/runtime still need Phase B proof",
-    "native selector behavior remains unproven and will be qualified separately on TikTok/native Android UI",
+    "exact TikTok package/version/launcher activity on Device #1 still needs read-only qualification",
+    "stable native TikTok selectors for Home/FYP, search/discover, profile and content containers are not yet captured",
+    "TikTok warm-up runtime primitives have not yet been qualified",
+    "boost explore/publish flow has not yet been qualified",
     "failure/branch edge semantics remain incomplete",
-    "the reported live XProxy position still needs an end-to-end HTTP(S) egress check and external-IP evidence before proxy-required workflows are enabled"
+    "the reported live XProxy position still needs an end-to-end HTTP(S) egress check before proxy-required workflows are enabled"
   ],
   "next": [
-    "restart the updated fixture server and inspect /status baseline",
-    "configure Phase B with coordinate Touch on the fixture input, TypeText with an empty selector, coordinate Touch on Submit, then Screenshot/Swipe as needed",
-    "verify the fixture /status pass counter increments after the GenFarmer run",
-    "capture exact Touch/TypeText option serialization from the saved Phase B flow",
-    "re-enable the normal Stop/termination path and repeat the complete Chrome qualification without manual intervention",
-    "qualify the reported live XProxy position with a real request through the proxy and keep external-IP evidence local/ignored",
-    "then begin the authorized TikTok qualification workflow"
+    "run scripts/tiktok_device_probe.py on Device #1 to identify package/version/launcher activity",
+    "open TikTok on Device #1 and capture stable native selectors with GenFarmer inspector/selector tooling",
+    "create GF Lab - TikTok Warmup Qualification with StartApp -> known-element wait -> bounded feed browse -> screenshot -> StopApp -> Stop",
+    "qualify a read-only warm-up flow before adding any write or engagement action",
+    "after the test account/device is explicitly marked ready, qualify Boost Explore and an approved publish path with idempotency/content-history checks",
+    "add structured action logging and only then prepare scheduler integration and scale gates"
   ]
 }

@@ -38,9 +38,10 @@ from genfarmer_automation.atx_bridge import (  # noqa: E402
     extract_atx_version,
 )
 from genfarmer_automation.ui_xml import (  # noqa: E402
-    TIKTOK_PACKAGE if False else UiXmlError,
+    UiXmlError,
+    learn_selector_candidates,
+    parse_ui_xml,
 )
-from genfarmer_automation.ui_xml import learn_selector_candidates, parse_ui_xml  # noqa: E402
 
 TIKTOK_PACKAGE = "com.zhiliaoapp.musically"
 DEFAULT_REMOTE_PORT = 7912

@@ -3,10 +3,10 @@
 
 GenFarmer's packaged source contains atx-agent/UiAutomator2 hierarchy support,
 but the helper is not listening on the usual 7912/6790 ports in the current lab
-session.  This probe derives candidate ports from *runtime evidence* on the
+session. This probe derives candidate ports from runtime evidence on the
 selected Android device (listening sockets and helper process command lines),
 then temporarily ADB-forwards only those ports and performs read-only HTTP
-probes.  If `/dump/hierarchy` is found, it captures repeated XML snapshots and
+probes. If `/dump/hierarchy` is found, it captures repeated XML snapshots and
 runs the existing conservative selector learner.
 
 No helper is installed or restarted. No WebDriver session is created. No app UI
@@ -98,7 +98,6 @@ def http_get(url: str, timeout: float) -> tuple[int, Any] | None:
             body = response.read()
             status = int(response.status)
     except urllib.error.HTTPError as exc:
-        # A 404/405 still proves an HTTP server is present on the forwarded port.
         body = exc.read()
         status = int(exc.code)
     except (urllib.error.URLError, TimeoutError, OSError):
@@ -223,7 +222,6 @@ def main() -> int:
 
     attempts: list[dict[str, Any]] = []
     selected_port: int | None = None
-    selected_base: str | None = None
     first_xml: str | None = None
 
     for remote_port in candidates:
@@ -247,19 +245,14 @@ def main() -> int:
             })
             if xml is not None:
                 selected_port = remote_port
-                selected_base = base
                 first_xml = xml
                 break
         finally:
-            if selected_port != remote_port:
-                remove_forward(device, local_port)
+            remove_forward(device, local_port)
 
     snapshots: list[str] = []
     selectors = []
-    selected_forward: int | None = None
     if selected_port is not None:
-        # Recreate one clean forward for repeated source sampling; do not rely on
-        # the short-lived discovery forward above.
         selected_forward = create_forward(device, selected_port)
         if selected_forward is not None:
             try:

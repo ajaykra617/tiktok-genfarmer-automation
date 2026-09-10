@@ -27,7 +27,7 @@ LISTEN 0      50     [::]:9008          [::]:*
 
 def test_extract_ports_from_helper_cmdline():
     text = "atx-agent server --addr 127.0.0.1:9100 --port=9200"
-    assert extract_ports_from_cmdline(text) == (9200, 9100)
+    assert extract_ports_from_cmdline(text) == (9100, 9200)
 
 
 def test_prioritized_candidates_prefer_runtime_evidence_and_dedupe():

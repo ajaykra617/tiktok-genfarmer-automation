@@ -1,9 +1,27 @@
-from genfarmer_automation.structure_paths import find_key_paths, set_existing_path, structure_paths
+from genfarmer_automation.structure_paths import (
+    find_key_paths,
+    find_scalar_value_paths,
+    set_existing_path,
+    structure_paths,
+)
 
 
 def test_find_key_paths_recurses_without_alias_guessing():
     value = {"options": {"XPath": "", "nested": [{"other": 1}]}, "xpathLike": "no"}
     assert find_key_paths(value, "xpath") == [("options", "XPath")]
+
+
+def test_find_scalar_value_paths_matches_exact_scalar_only():
+    value = {
+        "options": {"selector": "SENTINEL"},
+        "nested": ["other", {"value": "SENTINEL-extra"}],
+    }
+    assert find_scalar_value_paths(value, "SENTINEL") == [("options", "selector")]
+
+
+def test_find_scalar_value_paths_can_detect_ambiguity():
+    value = {"a": "SENTINEL", "b": [{"c": "SENTINEL"}]}
+    assert find_scalar_value_paths(value, "SENTINEL") == [("a",), ("b", 0, "c")]
 
 
 def test_set_existing_path_updates_only_existing_leaf():

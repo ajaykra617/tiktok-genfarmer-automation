@@ -1,7 +1,8 @@
 """Small helpers for inspecting and patching already-observed JSON structures.
 
 These helpers are intentionally schema-agnostic. They do not invent fields; they
-only locate keys that are already present in a captured GenFarmer payload.
+only locate keys or exact scalar values already present in a captured GenFarmer
+payload.
 """
 from __future__ import annotations
 
@@ -35,6 +36,30 @@ def find_key_paths(value: Any, target_key: str) -> list[tuple[PathPart, ...]]:
         elif isinstance(current, list):
             for index, child in enumerate(current):
                 walk(child, path + (index,))
+
+    walk(value, ())
+    return out
+
+
+def find_scalar_value_paths(value: Any, target: Any) -> list[tuple[PathPart, ...]]:
+    """Return paths whose scalar value exactly equals ``target``.
+
+    This is useful for one-time schema learning with a known sentinel value. It
+    never performs fuzzy matching and never treats container equality as a hit.
+    """
+    out: list[tuple[PathPart, ...]] = []
+
+    def walk(current: Any, path: tuple[PathPart, ...]) -> None:
+        if isinstance(current, dict):
+            for key, child in current.items():
+                walk(child, path + (str(key),))
+            return
+        if isinstance(current, list):
+            for index, child in enumerate(current):
+                walk(child, path + (index,))
+            return
+        if current == target:
+            out.append(path)
 
     walk(value, ())
     return out

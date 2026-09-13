@@ -109,12 +109,15 @@ def best_effort_selector(device: str, candidate, *, preferred_port: int | None):
 
     None means hierarchy unavailable. False means hierarchy was readable and the
     qualified selector was absent/non-unique, which is a hard failure.
+
+    The selector gate deliberately requires repeated evidence, so always capture
+    two fresh snapshots here rather than weakening the gate for runtime speed.
     """
     try:
         batch = capture_hierarchy_batch(
             device,
-            count=1,
-            interval=0.0,
+            count=2,
+            interval=0.12,
             preferred_port=preferred_port,
             helper_timeout=4.0,
             max_ports=8,

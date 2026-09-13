@@ -1,10 +1,13 @@
 """Bounded recovery for Android runtime permission dialogs shown over TikTok.
 
 The warm-up lane does not need contacts access. When Android's permission
-controller is the foreground interrupt, we may safely choose the exact
-"deny" control for TikTok and return to the app. We never grant permissions,
-never tap by guessed coordinates, and refuse to act unless the fresh hierarchy
-both references TikTok and exposes one known deny resource id.
+controller is the foreground interrupt, we first try to choose the exact deny
+control for TikTok from fresh hierarchy evidence. If Android's UIAutomator dump
+is temporarily unavailable while the permission controller owns the window, we
+use one KEYCODE_BACK dismissal as a safe fallback: it cannot grant the requested
+permission and we still require TikTok foreground/no-interrupt state afterward.
+
+We never grant permissions and never tap guessed coordinates.
 """
 from __future__ import annotations
 
@@ -27,6 +30,7 @@ _DENY_IDS = (
     "permission_deny_and_dont_ask_again_button",
     "permission_deny_selected_button",
 )
+KEYCODE_BACK = 4
 
 
 class ObserverLike(Protocol):
@@ -35,6 +39,7 @@ class ObserverLike(Protocol):
 
 class ActionsLike(Protocol):
     def tap(self, x: int, y: int): ...
+    def keyevent(self, keycode: int): ...
 
 
 @dataclass(frozen=True)
@@ -77,6 +82,57 @@ def find_tiktok_permission_deny_node(xml: str) -> UiNode:
     raise PermissionRecoveryError("no known Android permission-deny control found")
 
 
+def _poll_for_tiktok(
+    obs: ObserverLike,
+    *,
+    initial: DeviceObservation,
+    handled: bool,
+    reason_ok: str,
+    deny_resource_id: str | None,
+    poll_seconds: float,
+    max_polls: int,
+) -> PermissionRecoveryResult:
+    final = initial
+    for index in range(max_polls):
+        final = obs.observe()
+        if (
+            final.interrupt is InterruptKind.NONE
+            and final.adb_state == "device"
+            and final.tiktok_foreground
+        ):
+            return PermissionRecoveryResult(
+                True,
+                handled,
+                initial,
+                final,
+                reason_ok,
+                deny_resource_id=deny_resource_id,
+            )
+        if final.interrupt not in {
+            InterruptKind.NONE,
+            InterruptKind.ANDROID_PERMISSION_DIALOG,
+        }:
+            return PermissionRecoveryResult(
+                False,
+                handled,
+                initial,
+                final,
+                f"different interrupt appeared during permission recovery: {final.interrupt.value}",
+                deny_resource_id=deny_resource_id,
+            )
+        if index + 1 < max_polls and poll_seconds:
+            time.sleep(poll_seconds)
+
+    return PermissionRecoveryResult(
+        False,
+        handled,
+        initial,
+        final,
+        "permission dialog recovery did not return to a healthy TikTok foreground state",
+        deny_resource_id=deny_resource_id,
+    )
+
+
 def recover_tiktok_permission_dialog(
     device: str,
     *,
@@ -103,13 +159,22 @@ def recover_tiktok_permission_dialog(
 
     try:
         xml = capture_uiautomator_once(device, timeout=10.0)
-    except HierarchyRuntimeError as exc:
-        return PermissionRecoveryResult(
-            False,
-            False,
-            initial,
-            initial,
-            f"permission hierarchy unavailable: {exc}",
+    except HierarchyRuntimeError:
+        # Android can temporarily block/kill UIAutomator while the permission
+        # controller owns the top window. One BACK key is safe here: unlike an
+        # Allow button it cannot grant the requested permission. We still fail
+        # closed unless TikTok healthy foreground state is proven afterward.
+        act.keyevent(KEYCODE_BACK)
+        if settle_seconds:
+            time.sleep(settle_seconds)
+        return _poll_for_tiktok(
+            obs,
+            initial=initial,
+            handled=True,
+            reason_ok="TikTok permission dialog dismissed with safe BACK fallback and TikTok foreground restored",
+            deny_resource_id=None,
+            poll_seconds=poll_seconds,
+            max_polls=max_polls,
         )
 
     try:
@@ -122,42 +187,12 @@ def recover_tiktok_permission_dialog(
     if settle_seconds:
         time.sleep(settle_seconds)
 
-    final = initial
-    for index in range(max_polls):
-        final = obs.observe()
-        if (
-            final.interrupt is InterruptKind.NONE
-            and final.adb_state == "device"
-            and final.tiktok_foreground
-        ):
-            return PermissionRecoveryResult(
-                True,
-                True,
-                initial,
-                final,
-                "TikTok permission dialog denied and TikTok foreground restored",
-                deny_resource_id=target.resource_id,
-            )
-        if final.interrupt not in {
-            InterruptKind.NONE,
-            InterruptKind.ANDROID_PERMISSION_DIALOG,
-        }:
-            return PermissionRecoveryResult(
-                False,
-                True,
-                initial,
-                final,
-                f"different interrupt appeared after denying permission: {final.interrupt.value}",
-                deny_resource_id=target.resource_id,
-            )
-        if index + 1 < max_polls and poll_seconds:
-            time.sleep(poll_seconds)
-
-    return PermissionRecoveryResult(
-        False,
-        True,
-        initial,
-        final,
-        "permission dialog recovery did not return to a healthy TikTok foreground state",
+    return _poll_for_tiktok(
+        obs,
+        initial=initial,
+        handled=True,
+        reason_ok="TikTok permission dialog denied and TikTok foreground restored",
         deny_resource_id=target.resource_id,
+        poll_seconds=poll_seconds,
+        max_polls=max_polls,
     )

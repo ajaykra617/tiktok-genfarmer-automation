@@ -34,7 +34,7 @@ class ObserverLike(Protocol):
 
 
 class ActionsLike(Protocol):
-    def tap_point(self, *, x: int, y: int): ...
+    def tap(self, x: int, y: int): ...
 
 
 @dataclass(frozen=True)
@@ -118,7 +118,7 @@ def recover_tiktok_permission_dialog(
         return PermissionRecoveryResult(False, False, initial, initial, str(exc))
 
     x, y = target.center
-    act.tap_point(x=x, y=y)
+    act.tap(x, y)
     if settle_seconds:
         time.sleep(settle_seconds)
 

@@ -1,0 +1,43 @@
+{
+  "interval_minutes": [30, 73],
+  "waves": [
+    {
+      "name": "wave-1",
+      "tasks": [
+        {
+          "device": "GF#7",
+          "app": "tiktok",
+          "mode": "warmup",
+          "proxy_id": "proxy_01",
+          "preset": "standard"
+        },
+        {
+          "device": "GF#8",
+          "app": "reddit",
+          "mode": "warmup",
+          "proxy_id": "proxy_01",
+          "preset": "standard"
+        }
+      ]
+    },
+    {
+      "name": "wave-2",
+      "tasks": [
+        {
+          "device": "GF#7",
+          "app": "reddit",
+          "mode": "warmup",
+          "proxy_id": "proxy_01",
+          "preset": "standard"
+        },
+        {
+          "device": "GF#8",
+          "app": "tiktok",
+          "mode": "warmup",
+          "proxy_id": "proxy_02",
+          "preset": "standard"
+        }
+      ]
+    }
+  ]
+}

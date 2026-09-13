@@ -23,6 +23,7 @@ TIKTOK_PACKAGE = "com.zhiliaoapp.musically"
 class InterruptKind(str, Enum):
     NONE = "none"
     ANDROID_PERMISSION_DIALOG = "android_permission_dialog"
+    APP_NOT_RESPONDING = "app_not_responding"
     SYSTEM_UI = "system_ui"
     PACKAGE_INSTALLER = "package_installer"
     DEVICE_OFFLINE = "device_offline"
@@ -63,6 +64,12 @@ _PACKAGE_INSTALLERS = {
     "com.android.packageinstaller",
     "com.google.android.packageinstaller",
 }
+_ANR_PATTERNS: tuple[re.Pattern[str], ...] = (
+    re.compile(r"AppNotRespondingDialog", re.IGNORECASE),
+    re.compile(r"Application\s+Not\s+Responding", re.IGNORECASE),
+    re.compile(r"APP_NOT_RESPONDING", re.IGNORECASE),
+    re.compile(r"\bANR\b.*?" + re.escape(TIKTOK_PACKAGE), re.IGNORECASE),
+)
 
 
 def _adb(device: str, args: Iterable[str], *, timeout: float = 12.0, binary: bool = False):
@@ -97,9 +104,26 @@ def parse_foreground(*texts: str) -> tuple[str | None, str | None]:
     return None, None
 
 
-def classify_interrupt(adb_state: str, foreground_package: str | None) -> InterruptKind:
+def has_app_not_responding(*texts: str) -> bool:
+    """Detect Android's ANR surface from locale-independent dumpsys markers.
+
+    The visible dialog text itself is localized, so we deliberately key off
+    framework/window implementation markers rather than phrases such as
+    "TikTok isn't responding".
+    """
+    joined = "\n".join(text for text in texts if text)
+    return any(pattern.search(joined) for pattern in _ANR_PATTERNS)
+
+
+def classify_interrupt(
+    adb_state: str,
+    foreground_package: str | None,
+    *evidence_texts: str,
+) -> InterruptKind:
     if adb_state != "device":
         return InterruptKind.DEVICE_OFFLINE
+    if has_app_not_responding(*evidence_texts):
+        return InterruptKind.APP_NOT_RESPONDING
     if foreground_package in _PERMISSION_PACKAGES:
         return InterruptKind.ANDROID_PERMISSION_DIALOG
     if foreground_package in _PACKAGE_INSTALLERS:
@@ -130,7 +154,7 @@ class AdbObserver:
         window = _adb(self.device, ["shell", "dumpsys", "window", "windows"], timeout=self.timeout)
         activity = _adb(self.device, ["shell", "dumpsys", "activity", "activities"], timeout=self.timeout)
         package, component = parse_foreground(window, activity)
-        interrupt = classify_interrupt(state, package)
+        interrupt = classify_interrupt(state, package, window, activity)
         return DeviceObservation(
             device=self.device,
             adb_state=state,

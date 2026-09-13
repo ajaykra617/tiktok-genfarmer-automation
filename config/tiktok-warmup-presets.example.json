@@ -1,0 +1,26 @@
+{
+  "short": {
+    "videos": 12,
+    "watch_min_seconds": 7,
+    "watch_max_seconds": 18,
+    "max_session_minutes": 20,
+    "step_retries": 1,
+    "failure_budget": 2
+  },
+  "standard": {
+    "videos": 24,
+    "watch_min_seconds": 8,
+    "watch_max_seconds": 24,
+    "max_session_minutes": 40,
+    "step_retries": 1,
+    "failure_budget": 3
+  },
+  "long": {
+    "videos": 36,
+    "watch_min_seconds": 10,
+    "watch_max_seconds": 30,
+    "max_session_minutes": 60,
+    "step_retries": 2,
+    "failure_budget": 4
+  }
+}

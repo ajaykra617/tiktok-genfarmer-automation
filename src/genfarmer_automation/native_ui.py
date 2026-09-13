@@ -8,7 +8,6 @@ from __future__ import annotations
 from dataclasses import dataclass
 import re
 from typing import Iterable
-import xml.etree.ElementTree as ET
 
 from .ui_xml import parse_ui_xml
 
@@ -132,7 +131,6 @@ def find_semantic_node(
         score = _score(node, terms)
         if score <= 0:
             continue
-        # Prefer smaller controls when semantic confidence is otherwise equal.
         candidates.append((score, -node.area, node))
     if not candidates:
         raise NativeUiNotFound("no runtime UI node matched the requested semantic terms")
@@ -143,6 +141,32 @@ def find_semantic_node(
     if len(centers) > 1:
         raise NativeUiAmbiguous("multiple runtime UI nodes tied for the best semantic match")
     return top
+
+
+def find_exact_semantic_node(
+    xml: str,
+    terms: Iterable[str],
+    *,
+    package: str | None = None,
+) -> UiNode:
+    """Require exact text/content-desc equality for high-consequence controls."""
+    wanted = {_norm(term) for term in terms if _norm(term)}
+    matches: list[UiNode] = []
+    for node in collect_nodes(xml, package=package):
+        if not node.enabled:
+            continue
+        values = {_norm(node.text), _norm(node.content_desc)}
+        if wanted.intersection(values):
+            matches.append(node)
+    if not matches:
+        raise NativeUiNotFound("no exact runtime UI node matched the requested semantic terms")
+    clickable = [node for node in matches if node.clickable]
+    if clickable:
+        matches = clickable
+    centers = {node.center for node in matches}
+    if len(centers) != 1:
+        raise NativeUiAmbiguous("multiple exact runtime UI nodes matched the requested semantic terms")
+    return min(matches, key=lambda node: node.area)
 
 
 def find_editable_node(xml: str, *, package: str | None = None, hints: Iterable[str] = ()) -> UiNode:

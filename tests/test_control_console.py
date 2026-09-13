@@ -22,12 +22,13 @@ def test_parse_adb_devices_long_listing():
 
 
 def test_build_warmup_command_is_argument_list():
+    compiled = Path("C:/Downloads/Browse One.genfarm")
     cmd = build_warmup_command(
         python_exe="python",
         root=Path("C:/repo"),
         preset_file=Path("C:/repo/config/presets.json"),
         preset="standard",
-        compiled=Path("C:/Downloads/Browse One.genfarm"),
+        compiled=compiled,
         candidates=Path("C:/repo/evidence/private/candidates.json"),
         candidate=8,
         device="device:5555",
@@ -36,7 +37,9 @@ def test_build_warmup_command_is_argument_list():
     assert cmd[0] == "python"
     assert "standard" in cmd
     assert cmd[-1] == "--apply"
-    assert "C:/Downloads/Browse One.genfarm" in cmd
+    # pathlib renders separators for the host OS. Compare as Paths so this test
+    # is valid on both Windows (backslashes) and POSIX (forward slashes).
+    assert Path(cmd[4]) == compiled
 
 
 def test_build_boost_requires_paired_explore_fields():

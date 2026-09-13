@@ -4,6 +4,7 @@ from genfarmer_automation.native_ui import (
     NativeUiAmbiguous,
     NativeUiNotFound,
     find_editable_node,
+    find_exact_semantic_node,
     find_semantic_node,
     parse_bounds,
 )
@@ -42,6 +43,20 @@ def test_semantic_match_prefers_exact_text():
     match = find_semantic_node(doc, ["Post"])
     assert match.text == "Post"
     assert match.center == (50, 50)
+
+
+def test_exact_semantic_match_will_not_accept_post_settings():
+    doc = xml(node(**{"content-desc": "Post settings"}))
+    with pytest.raises(NativeUiNotFound):
+        find_exact_semantic_node(doc, ["Post"])
+
+
+def test_exact_semantic_match_selects_post():
+    doc = xml(
+        node(text="Post", bounds="[0,0][100,100]"),
+        node(**{"content-desc": "Post settings", "bounds": "[0,100][300,200]"}),
+    )
+    assert find_exact_semantic_node(doc, ["Post"]).center == (50, 50)
 
 
 def test_semantic_match_fails_closed_on_missing():

@@ -165,7 +165,6 @@ def _watch_active_tiktok(
             raise RuntimeError("watch interval would exceed session deadline")
         time.sleep(chunk)
         remaining = max(0.0, remaining - chunk)
-    # Catch a prompt that appeared during the last sleep before running an action.
     recoveries += _ensure_watch_ready(device, observer)
     return recoveries
 
@@ -193,6 +192,7 @@ def main() -> int:
     previous: Mapping[str, Any] | None = None
     resume_at = 0
     failures = 0
+    failure_budget_base = 0
     step_records: list[dict[str, Any]] = []
 
     if args.resume:
@@ -204,6 +204,7 @@ def main() -> int:
             plan = _checkpoint_plan(previous)
             resume_at = completed_index(previous, total=plan.video_count)
             failures = int(previous.get("failed_attempts", 0))
+            failure_budget_base = failures
             old_records = previous.get("steps", [])
             if isinstance(old_records, list):
                 step_records = [dict(item) for item in old_records if isinstance(item, Mapping)]
@@ -314,7 +315,6 @@ def main() -> int:
             for attempt in range(plan.step_retries + 1):
                 if time.monotonic() - started >= plan.max_session_seconds:
                     raise RuntimeError("session deadline reached during step retry")
-                # A permission prompt may appear between the watch gate and the action.
                 extra_recoveries = _ensure_watch_ready(args.device, observer)
                 step_permission_recoveries += extra_recoveries
                 permission_recoveries += extra_recoveries
@@ -338,10 +338,9 @@ def main() -> int:
                 if passed:
                     break
                 failures += 1
-                if failures > plan.failure_budget:
+                if failures - failure_budget_base > plan.failure_budget:
                     raise RuntimeError("session failure budget exceeded")
                 if attempt < plan.step_retries:
-                    # Recover a permission interrupt before the bounded retry.
                     retry_recoveries = _ensure_watch_ready(args.device, observer)
                     step_permission_recoveries += retry_recoveries
                     permission_recoveries += retry_recoveries
@@ -372,6 +371,7 @@ def main() -> int:
                 "seed": seed,
                 "completed_steps": index + 1,
                 "failed_attempts": failures,
+                "failed_attempts_this_invocation": failures - failure_budget_base,
                 "steps": step_records,
                 "plan": plan.to_dict(),
             }
@@ -388,6 +388,7 @@ def main() -> int:
                 "requested_steps": plan.video_count,
                 "completed_steps": plan.video_count,
                 "failed_attempts": failures,
+                "failed_attempts_this_invocation": failures - failure_budget_base,
                 "elapsed_seconds": elapsed,
                 "full_selector_steps": full_selector_steps,
                 "foreground_continuity_steps": degraded_steps,
@@ -409,7 +410,8 @@ def main() -> int:
         print(f"GenFarmer actions:          {genfarmer_steps}")
         print(f"ADB fallback actions:       {adb_steps}")
         print(f"Permission recoveries:      {permission_recoveries}")
-        print(f"Failed attempts recovered:  {failures}")
+        print(f"Failed attempts total:      {failures}")
+        print(f"Failed attempts this run:   {failures - failure_budget_base}")
         print(f"Elapsed:                    {elapsed:.2f}s")
         print(f"Private checkpoint:         {checkpoint_path.relative_to(ROOT)}")
         print(f"Shareable result:           {shareable_path.relative_to(ROOT)}")
@@ -421,6 +423,7 @@ def main() -> int:
             "seed": seed,
             "completed_steps": len(step_records),
             "failed_attempts": failures,
+            "failed_attempts_this_invocation": failures - failure_budget_base,
             "steps": step_records,
             "plan": plan.to_dict(),
             "blocked_reason": str(exc),
@@ -432,6 +435,7 @@ def main() -> int:
                 "requested_steps": plan.video_count,
                 "completed_steps": len(step_records),
                 "failed_attempts": failures,
+                "failed_attempts_this_invocation": failures - failure_budget_base,
                 "permission_recoveries": permission_recoveries,
                 "reason": str(exc),
                 "checkpoint_private": True,

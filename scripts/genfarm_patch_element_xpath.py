@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
 """Patch one learned private XPath into a GenFarmer ElementExists node.
 
-The script never guesses undocumented option fields.  It accepts only an
-ElementExists node whose existing options expose exactly one key normalized to
-`xpath`; otherwise it fails closed and prints only available key names.
+The script never invents undocumented fields. It searches the already-captured
+ElementExists ``data`` structure recursively and patches only when exactly one
+existing key normalizes to ``xpath``. If no such field is present, it fails
+closed and points to the structural probe instead of creating a guessed field.
 """
 from __future__ import annotations
 
@@ -20,6 +21,7 @@ if str(SRC) not in sys.path:
     sys.path.insert(0, str(SRC))
 
 from genfarmer_automation.genfarm_file import GenFarmDocument, GenFarmFileError  # noqa: E402
+from genfarmer_automation.structure_paths import find_key_paths, set_existing_path  # noqa: E402
 
 
 def action_of(node: Mapping[str, Any]) -> str | None:
@@ -31,25 +33,20 @@ def action_of(node: Mapping[str, Any]) -> str | None:
     return None
 
 
-def normalized_key(value: str) -> str:
-    return "".join(ch.lower() for ch in value if ch.isalnum())
-
-
-def xpath_option_key(options: Mapping[str, Any]) -> str:
-    matches = [str(key) for key in options if normalized_key(str(key)) == "xpath"]
-    if len(matches) != 1:
-        keys = ", ".join(sorted(map(str, options.keys()))) or "<none>"
-        raise GenFarmFileError(
-            "ElementExists options do not expose exactly one verified XPath key; "
-            f"available keys: {keys}"
-        )
-    return matches[0]
+def printable_path(path: tuple[str | int, ...]) -> str:
+    out = "$"
+    for part in path:
+        if isinstance(part, int):
+            out += f"[{part}]"
+        else:
+            out += f".{part}"
+    return out
 
 
 def main() -> int:
     ap = argparse.ArgumentParser(description="Patch a learned private XPath into ElementExists")
     ap.add_argument("input", type=Path, help="feed-anchor qualification .genfarm")
-    ap.add_argument("candidates", type=Path, help="private candidates.private.json from tiktok_ui_xml_selector_probe.py")
+    ap.add_argument("candidates", type=Path, help="private candidate/ranked-candidate JSON")
     ap.add_argument("--candidate", type=int, default=1, help="1-based candidate index")
     ap.add_argument("--output", type=Path, required=True)
     args = ap.parse_args()
@@ -67,10 +64,21 @@ def main() -> int:
             raise GenFarmFileError(f"expected exactly one ElementExists node; found {len(nodes)}")
         node = nodes[0]
         data = node.get("data")
-        options = data.get("options") if isinstance(data, Mapping) else None
-        if not isinstance(options, dict):
-            raise GenFarmFileError("ElementExists node has no mutable data.options object")
-        key = xpath_option_key(options)
+        if not isinstance(data, dict):
+            raise GenFarmFileError("ElementExists node has no mutable data object")
+
+        xpath_paths = find_key_paths(data, "xpath")
+        if len(xpath_paths) != 1:
+            if not xpath_paths:
+                raise GenFarmFileError(
+                    "ElementExists captured data contains no existing XPath key anywhere; "
+                    "no field was invented. Run scripts/genfarm_elementexists_schema_probe.py on this export."
+                )
+            visible = ", ".join(printable_path(path) for path in xpath_paths)
+            raise GenFarmFileError(
+                "ElementExists captured data exposes multiple XPath keys; refusing ambiguous patch: " + visible
+            )
+        xpath_path = xpath_paths[0]
 
         raw_candidates = json.loads(args.candidates.read_text(encoding="utf-8"))
         if not isinstance(raw_candidates, list) or len(raw_candidates) < args.candidate:
@@ -86,8 +94,10 @@ def main() -> int:
             n for n in copied.flow.nodes
             if isinstance(n, Mapping) and action_of(n) == "ElementExists"
         ]
-        target_data = target_nodes[0]["data"]
-        target_data["options"][key] = xpath
+        target_data = target_nodes[0].get("data")
+        if not isinstance(target_data, dict):
+            raise GenFarmFileError("copied ElementExists node has no mutable data object")
+        set_existing_path(target_data, xpath_path, xpath)
         copied.save(args.output)
 
         print("=" * 78)
@@ -96,7 +106,7 @@ def main() -> int:
         print(f"Input:          {args.input}")
         print(f"Candidate:      {args.candidate}")
         print(f"Selector kind:  {selected.get('kind', '<unknown>') if isinstance(selected, Mapping) else '<unknown>'}")
-        print(f"XPath option:   {key}")
+        print(f"XPath field:    {printable_path(xpath_path)}")
         print(f"Output:         {args.output}")
         print("XPath value intentionally not printed; exact value remains local/private.")
         print("Next: use genfarm_apply_to_app.py dry-run, then --apply after review.")

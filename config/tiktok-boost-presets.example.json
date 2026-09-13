@@ -1,0 +1,16 @@
+{
+  "explore_then_publish": {
+    "explore_type": "keyword",
+    "explore_value": "example niche",
+    "candidate": 8,
+    "publish": true,
+    "duplicate_guard": true,
+    "account_ready_required": true
+  },
+  "publish_only": {
+    "candidate": 8,
+    "publish": true,
+    "duplicate_guard": true,
+    "account_ready_required": true
+  }
+}

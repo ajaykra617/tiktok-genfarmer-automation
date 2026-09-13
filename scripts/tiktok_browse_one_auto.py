@@ -1,16 +1,14 @@
 #!/usr/bin/env python3
 """One-command resilient TikTok browse-one supervisor.
 
-This command keeps GenFarmer as the action executor but removes two brittle
-operator steps:
-- foreground recovery is performed automatically in apply mode using the already
-  qualified TikTok launcher component;
-- hierarchy capture treats the GenFarmer helper port as a hint, auto-discovers a
-  healthy helper endpoint, and falls back to bounded ADB uiautomator XML if the
-  helper is stale or wedged.
+Python owns recovery, verification and orchestration; GenFarmer remains the
+actual Android action executor. The command automatically handles foreground
+recovery, hierarchy-source fallback, stale/wedged helper ports, and one
+server-side stale-task style run-create failure.
 
-Success still requires independent application-level evidence: the qualified
-feed selector must be unique before and after the GenFarmer browse-one run.
+Success requires independent application-level evidence: the qualified feed
+selector must be unique immediately before and after the GenFarmer browse-one
+run. No GenFarmer HTTP/node response is accepted as the postcondition by itself.
 """
 from __future__ import annotations
 
@@ -47,6 +45,10 @@ from genfarmer_automation.hierarchy_runtime import (  # noqa: E402
     capture_hierarchy_batch,
 )
 from genfarmer_automation.run_binding import extract_run_bindings, newest_for_app  # noqa: E402
+from genfarmer_automation.run_bootstrap import (  # noqa: E402
+    RunBootstrapError,
+    create_run_with_task_refresh,
+)
 from genfarmer_automation.selector_gate import assess_selector_gate  # noqa: E402
 from genfarmer_automation.tiktok_runtime import TikTokRuntime  # noqa: E402
 
@@ -231,6 +233,7 @@ def main() -> int:
         "selector_value_private": True,
         "action_executor": "genfarmer",
         "hierarchy_source_policy": "auto-helper-then-uiautomator",
+        "run_create_policy": "existing-task-then-one-fresh-task-on-5xx",
     }
 
     try:
@@ -343,12 +346,32 @@ def main() -> int:
             return 0
 
         mutation = GenFarmerClient(base_url, timeout=20.0, allow_mutations=True)
-        created = mutation.create_run(
+        recovery_task_name = f"Python Browse One Recovery {stamp}"
+        bootstrap = create_run_with_task_refresh(
+            mutation,
             user_id=user_id,
-            task_id=selected.task_id,
             app_id=app_id,
-            status=0,
+            task_id=selected.task_id,
+            recovery_task_name=recovery_task_name,
         )
+        (private / "run-bootstrap.private.json").write_text(
+            json.dumps(
+                {
+                    "task_refreshed": bootstrap.task_refreshed,
+                    "initial_http_status": bootstrap.initial_http_status,
+                    "initial_error_data": bootstrap.initial_error_data,
+                    "created_task": bootstrap.created_task,
+                },
+                ensure_ascii=False,
+                indent=2,
+                default=str,
+            ),
+            encoding="utf-8",
+        )
+        result["task_refreshed"] = bootstrap.task_refreshed
+        result["initial_create_run_http_status"] = bootstrap.initial_http_status
+
+        created = bootstrap.created_run
         (private / "create-run.response.json").write_text(
             json.dumps(created, ensure_ascii=False, indent=2),
             encoding="utf-8",
@@ -356,7 +379,7 @@ def main() -> int:
         created_binding = created_run_binding(
             created,
             app_id=app_id,
-            task_id=selected.task_id,
+            task_id=bootstrap.task_id,
         )
         if created_binding is None:
             raise RuntimeError("fresh GenFarmer run id was not proven; execution not attempted")
@@ -441,6 +464,7 @@ def main() -> int:
         print("Mode:                       APPLY")
         print("Status:                     PASS_SELECTOR_GUARDED_EXECUTION")
         print(f"Foreground recovery:        {'YES' if foreground_recovered else 'NOT NEEDED'}")
+        print(f"Task refresh after 5xx:     {'YES' if bootstrap.task_refreshed else 'NO'}")
         print(f"Feed selector pre-counts:   {pre_gate.counts}")
         print(f"Feed selector post-counts:  {post_gate.counts}")
         print(f"Pre hierarchy provider:     {before_batch.provider}")
@@ -460,6 +484,7 @@ def main() -> int:
         GenFarmFileError,
         GenFarmerError,
         HierarchyRuntimeError,
+        RunBootstrapError,
     ) as exc:
         result["status"] = "BLOCKED"
         result["reason"] = str(exc)

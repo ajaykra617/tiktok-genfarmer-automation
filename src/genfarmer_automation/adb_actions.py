@@ -1,14 +1,15 @@
 """Small, explicit ADB mutation helpers used only for bounded recovery/lab probes.
 
-GenFarmer remains the normal workflow executor. These helpers exist so the
-Python supervisor can restore a coarse known checkpoint (for example, relaunch
-an authorized app that is no longer foreground) and perform tightly-scoped lab
-qualification without blind UI taps.
+GenFarmer remains the preferred workflow executor. These helpers exist so the
+Python supervisor can restore a coarse known checkpoint and, when GenFarmer is
+unavailable, execute tightly-scoped actions whose targets were derived from
+fresh runtime evidence. Fixed guessed production coordinates remain prohibited.
 """
 
 from __future__ import annotations
 
 from dataclasses import dataclass
+import re
 import subprocess
 from typing import Iterable
 
@@ -21,6 +22,10 @@ class AdbActionError(RuntimeError):
 class AdbActionResult:
     command: str
     stdout: str
+
+
+_PACKAGE_RE = re.compile(r"^[A-Za-z0-9_.]+$")
+_SAFE_TEXT_RE = re.compile(r"^[A-Za-z0-9 _.,!?@:+\-]*$")
 
 
 class AdbActions:
@@ -47,15 +52,47 @@ class AdbActions:
         return proc.stdout.decode(errors="replace").strip()
 
     def launch_component(self, component: str) -> AdbActionResult:
-        """Launch one explicitly qualified Android component.
-
-        This does not search for packages, install software, or tap through UI.
-        The caller must provide a known authorized component.
-        """
+        """Launch one explicitly qualified Android component."""
         if "/" not in component or any(ch.isspace() for ch in component):
             raise ValueError("component must be PACKAGE/ACTIVITY without whitespace")
         out = self._run(["shell", "am", "start", "-W", "-n", component])
         return AdbActionResult(command="launch_component", stdout=out)
+
+    def tap(self, x: int, y: int) -> AdbActionResult:
+        """Tap one runtime-derived coordinate."""
+        if not isinstance(x, int) or isinstance(x, bool) or x < 0:
+            raise ValueError("x must be a non-negative integer")
+        if not isinstance(y, int) or isinstance(y, bool) or y < 0:
+            raise ValueError("y must be a non-negative integer")
+        out = self._run(["shell", "input", "tap", str(x), str(y)])
+        return AdbActionResult(command="tap", stdout=out)
+
+    def keyevent(self, keycode: int) -> AdbActionResult:
+        if not isinstance(keycode, int) or isinstance(keycode, bool) or not 0 <= keycode <= 1000:
+            raise ValueError("keycode must be an integer 0..1000")
+        out = self._run(["shell", "input", "keyevent", str(keycode)])
+        return AdbActionResult(command="keyevent", stdout=out)
+
+    def input_text(self, text: str) -> AdbActionResult:
+        """Type conservative ASCII text without passing shell metacharacters.
+
+        Spaces use Android input's `%s` encoding. Rich/unicode captions should
+        use a separately qualified IME/clipboard path rather than weakening this
+        safety boundary.
+        """
+        if not isinstance(text, str) or len(text) > 2200:
+            raise ValueError("text must be a string no longer than 2200 characters")
+        if not _SAFE_TEXT_RE.fullmatch(text):
+            raise ValueError("text contains characters not qualified for ADB input_text")
+        encoded = text.replace(" ", "%s")
+        out = self._run(["shell", "input", "text", encoded])
+        return AdbActionResult(command="input_text", stdout=out)
+
+    def stop_package(self, package: str) -> AdbActionResult:
+        if not _PACKAGE_RE.fullmatch(package):
+            raise ValueError("invalid Android package")
+        out = self._run(["shell", "am", "force-stop", package])
+        return AdbActionResult(command="stop_package", stdout=out)
 
     def swipe_up_relative(
         self,
@@ -67,12 +104,10 @@ class AdbActions:
         start_y_fraction: float = 0.72,
         end_y_fraction: float = 0.28,
     ) -> AdbActionResult:
-        """Perform one bounded device-relative upward swipe for lab qualification.
+        """Perform one bounded device-relative upward swipe.
 
-        Coordinates are derived from the *measured current screen geometry*;
-        there are no fixed device-specific pixels. This is intentionally a lab
-        helper. Production browsing should prefer the already-qualified
-        GenFarmer Simple/Up Swipe node as the action executor.
+        Coordinates are derived from the measured current screen geometry; there
+        are no fixed device-specific pixels.
         """
         if width <= 0 or height <= 0:
             raise ValueError("width/height must be positive")

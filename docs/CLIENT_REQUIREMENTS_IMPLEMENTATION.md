@@ -42,6 +42,19 @@ Checkpoints / resume | Implemented
 Permission-dialog recovery | Implemented for TikTok Android runtime permission dialogs; deny-only/no permission grant
 Logging/evidence | Implemented per step/session
 
+### Qualification evidence
+
+The standard TikTok FYP session has now completed a full 24-video live soak on the primary healthy Pixel test device:
+
+- 24/24 requested videos completed;
+- 24/24 steps used full selector verification;
+- zero continuity-only steps;
+- zero failed attempts in the standard run;
+- bounded watch-time variation was active throughout;
+- the Python fallback action backend was used for all 24 swipes while independent selector gates proved feed state before/after each action.
+
+An earlier interrupted 8-video run also proved checkpoint/resume and automatic deny-only recovery of a TikTok Android contacts permission dialog.
+
 ### Engagement boundary
 
 Light likes, follows, replies, mass follow/unfollow, coordinated engagement and cross-account interaction are not part of the active Warm-up implementation. Passive browsing, niche exploration, profile/comments viewing and owned-account posting are the supported lanes.
@@ -114,12 +127,11 @@ The UI launches the same tested Python scripts used from PowerShell rather than 
 
 ## Next qualification order
 
-1. Finish 24-video TikTok Warm-up soak on GF#7.
-2. Qualify Warm-up profile/comments/source switching.
-3. Run Boost Explore to `READY_TO_PUBLISH` with disposable owned media.
-4. Run one disposable real publish and verify return-to-feed.
-5. Qualify scheduling and photo-set posting.
-6. Add XProxy assignment/readiness executor behind the scheduler policy.
-7. Add a real barrier-wave scheduler executor.
-8. Scale TikTok to a second healthy device, then more devices.
-9. Build Instagram/Reddit/X adapters against the same UI/scheduler/log contracts.
+1. Qualify Warm-up profile/comments/source switching on the primary healthy device.
+2. Run Boost Explore to `READY_TO_PUBLISH` with disposable owned media.
+3. Run one disposable real publish and verify return-to-feed.
+4. Qualify scheduling and photo-set posting.
+5. Add XProxy assignment/readiness executor behind the scheduler policy.
+6. Add a real barrier-wave scheduler executor.
+7. Scale TikTok to a second healthy device, then more devices.
+8. Build Instagram/Reddit/X adapters against the same UI/scheduler/log contracts.

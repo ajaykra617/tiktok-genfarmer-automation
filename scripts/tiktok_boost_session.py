@@ -35,6 +35,14 @@ def _run(cmd: list[str], *, timeout: float) -> subprocess.CompletedProcess[str]:
     )
 
 
+def _last_error_line(output: str) -> str | None:
+    lines = [line.strip() for line in (output or "").splitlines() if line.strip()]
+    for line in reversed(lines):
+        if line.startswith("ERROR:"):
+            return line[6:].strip()
+    return lines[-1] if lines else None
+
+
 def main() -> int:
     ap = argparse.ArgumentParser(description="End-to-end authorized TikTok Boost session")
     ap.add_argument("--device", required=True)
@@ -100,7 +108,8 @@ def main() -> int:
             (private / "explore.log").write_text(explore.stdout or "", encoding="utf-8", errors="replace")
             explore_payload = load_shareable(ROOT, explore.stdout or "")
             if explore.returncode != 0 or explore_payload is None or explore_payload.get("status") != "PASS":
-                raise RuntimeError("Boost explore stage did not reach PASS; publish was not attempted")
+                detail = _last_error_line(explore.stdout or "")
+                raise RuntimeError(f"Boost explore stage blocked: {detail or 'no PASS result'}")
             result["explore_status"] = "PASS"
 
         publish_cmd = [
@@ -128,7 +137,8 @@ def main() -> int:
         (private / "publish.log").write_text(publish.stdout or "", encoding="utf-8", errors="replace")
         publish_payload = load_shareable(ROOT, publish.stdout or "")
         if publish.returncode != 0 or publish_payload is None:
-            raise RuntimeError("Boost publish stage was blocked; inspect private publish log/evidence")
+            detail = _last_error_line(publish.stdout or "")
+            raise RuntimeError(f"Boost publish stage blocked: {detail or 'no structured result'}")
         publish_status = publish_payload.get("status")
         expected = "PASS_PUBLISHED" if args.publish else "READY_TO_PUBLISH"
         if publish_status != expected:

@@ -5,6 +5,7 @@ Safety/correctness properties:
 - the local file is hash-addressed before it reaches the device;
 - successful hashes are blocked from re-use by default;
 - the exact staged MediaStore URI is sent to TikTok, avoiding gallery ambiguity;
+- Android share-sheet handoff is bounded and hierarchy-derived;
 - UI taps are derived from fresh hierarchy bounds, never fixed guessed pixels;
 - the final Post/Publish control requires exact semantic equality;
 - actual publishing requires both --apply and --publish;
@@ -39,6 +40,10 @@ from genfarmer_automation.boost_media import (  # noqa: E402
     media_spec,
     record_history,
 )
+from genfarmer_automation.boost_share_handoff import (  # noqa: E402
+    find_tiktok_share_target,
+    is_system_share_surface,
+)
 from genfarmer_automation.feed_anchor_qualification import candidates_from_payload  # noqa: E402
 from genfarmer_automation.hierarchy_runtime import HierarchyRuntimeError, capture_hierarchy_batch  # noqa: E402
 from genfarmer_automation.native_ui import (  # noqa: E402
@@ -48,6 +53,7 @@ from genfarmer_automation.native_ui import (  # noqa: E402
     find_editable_node,
     find_exact_semantic_node,
 )
+from genfarmer_automation.permission_recovery import recover_tiktok_permission_dialog  # noqa: E402
 from genfarmer_automation.selector_gate import assess_selector_gate  # noqa: E402
 
 TIKTOK_PACKAGE = "com.zhiliaoapp.musically"
@@ -90,6 +96,75 @@ def _tiktok_ready(observer: AdbObserver) -> bool:
         obs.adb_state == "device"
         and obs.tiktok_foreground
         and obs.interrupt is InterruptKind.NONE
+    )
+
+
+def _ensure_share_handoff(
+    *,
+    device: str,
+    observer: AdbObserver,
+    actions: AdbActions,
+    preferred_port: int,
+    private: Path,
+    timeout: float = 18.0,
+) -> tuple[int, int, list[dict[str, object]]]:
+    """Prove targeted media share reached TikTok, resolving only known safe surfaces."""
+    deadline = time.monotonic() + timeout
+    chooser_taps = 0
+    permission_recoveries = 0
+    observations: list[dict[str, object]] = []
+    unknown_streak = 0
+
+    while time.monotonic() < deadline:
+        obs = observer.observe()
+        observations.append(obs.to_dict())
+        if obs.tiktok_foreground and obs.interrupt is InterruptKind.NONE:
+            return chooser_taps, permission_recoveries, observations
+
+        if obs.interrupt is InterruptKind.ANDROID_PERMISSION_DIALOG:
+            recovered = recover_tiktok_permission_dialog(device, observer=observer, actions=actions)
+            if not recovered.success:
+                raise RuntimeError(f"permission dialog blocked media handoff: {recovered.reason}")
+            permission_recoveries += int(recovered.handled)
+            unknown_streak = 0
+            time.sleep(0.5)
+            continue
+
+        if is_system_share_surface(obs.foreground_package, obs.foreground_activity):
+            observer.capture_screenshot(private / f"share-surface-{chooser_taps + 1:02d}.png")
+            xml, provider = _capture_xml(device, preferred_port)
+            (private / f"share-surface-{chooser_taps + 1:02d}.xml").write_text(xml, encoding="utf-8")
+            target = find_tiktok_share_target(xml)
+            _tap(actions, target)
+            chooser_taps += 1
+            (private / "share-handoff-provider.txt").write_text(provider, encoding="utf-8")
+            unknown_streak = 0
+            time.sleep(1.5)
+            continue
+
+        if obs.interrupt is not InterruptKind.NONE:
+            raise RuntimeError(
+                "Android interrupt blocked media handoff: "
+                f"{obs.interrupt.value} foreground={obs.foreground_package}/{obs.foreground_activity}"
+            )
+
+        # App/launcher transitions can briefly win foreground while TikTok starts.
+        # Wait a few consecutive samples, but do not tap unknown surfaces.
+        unknown_streak += 1
+        if unknown_streak >= 4:
+            break
+        time.sleep(1.0)
+
+    final = observer.observe()
+    observations.append(final.to_dict())
+    try:
+        observer.capture_screenshot(private / "share-handoff-blocked.png")
+    except Exception:
+        pass
+    raise RuntimeError(
+        "targeted media share did not hand off to TikTok; "
+        f"foreground={final.foreground_package}/{final.foreground_activity}, "
+        f"interrupt={final.interrupt.value}"
     )
 
 
@@ -209,11 +284,29 @@ def main() -> int:
             encoding="utf-8",
         )
 
-        stager.launch_tiktok_share(staged, package=TIKTOK_PACKAGE)
-        time.sleep(4.0)
+        launch_output = stager.launch_tiktok_share(staged, package=TIKTOK_PACKAGE)
+        (private / "share-launch.txt").write_text(launch_output or "", encoding="utf-8", errors="replace")
 
         observer = AdbObserver(args.device)
         actions = AdbActions(args.device)
+        chooser_taps, permission_recoveries, handoff_observations = _ensure_share_handoff(
+            device=args.device,
+            observer=observer,
+            actions=actions,
+            preferred_port=args.preferred_hierarchy_port,
+            private=private,
+        )
+        (private / "share-handoff.private.json").write_text(
+            json.dumps(handoff_observations, indent=2), encoding="utf-8"
+        )
+        result.update(
+            {
+                "share_handoff_verified": True,
+                "share_chooser_taps": chooser_taps,
+                "share_permission_recoveries": permission_recoveries,
+            }
+        )
+
         caption_entered = not bool(args.caption)
         final_ready = False
         providers: list[str] = []
@@ -223,7 +316,10 @@ def main() -> int:
             if obs.interrupt is not InterruptKind.NONE:
                 raise RuntimeError(f"Android/TikTok interrupt blocks publish flow: {obs.interrupt.value}")
             if not obs.tiktok_foreground:
-                raise RuntimeError("TikTok is not foreground after targeted media share")
+                raise RuntimeError(
+                    "TikTok left foreground during publish flow; "
+                    f"foreground={obs.foreground_package}/{obs.foreground_activity}"
+                )
 
             observer.capture_screenshot(private / f"ui-{step:02d}.png")
             xml, provider = _capture_xml(args.device, args.preferred_hierarchy_port)
@@ -241,7 +337,7 @@ def main() -> int:
                 ):
                     _tap(actions, editable)
                     actions.input_text(args.caption)
-                    actions.keyevent(4)  # BACK: dismiss IME without navigating app state.
+                    actions.keyevent(4)
                     caption_entered = True
                     time.sleep(1.0)
                     continue
@@ -269,6 +365,7 @@ def main() -> int:
                     print("TIKTOK BOOST PUBLISH")
                     print("=" * 78)
                     print("Status:                     READY_TO_PUBLISH")
+                    print(f"Share chooser taps:         {chooser_taps}")
                     print("Exact final Post control:   YES")
                     print("Final publish tap:          NOT PERMITTED (add --publish)")
                     print(f"Private evidence:           {private.relative_to(ROOT)}")

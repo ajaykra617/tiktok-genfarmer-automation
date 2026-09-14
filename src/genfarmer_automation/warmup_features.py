@@ -57,6 +57,32 @@ def find_feed_source_node(xml: str, source: str, *, package: str | None = None) 
     return find_exact_semantic_node(xml, terms, package=package)
 
 
+def following_empty_state(xml: str, *, package: str | None = None) -> ContextProof:
+    """Recognize TikTok's legitimate empty Following-feed prerequisite state.
+
+    A newly prepared account may have no followed creators. In that case TikTok
+    shows a recommendation/empty-state screen instead of feed items. That is not
+    an automation failure and must not trigger an automated Follow action.
+    """
+    matched: list[str] = []
+    for node in collect_nodes(xml, package=package):
+        joined = f"{node.text} {node.content_desc}"
+        if _contains_any(joined, ("Trending creators", "Créateurs tendance")):
+            if "trending-creators" not in matched:
+                matched.append("trending-creators")
+        if _contains_any(
+            joined,
+            (
+                "Follow an account to see their latest videos here",
+                "Follow an account to see their latest videos here.",
+                "Suivez un compte",
+            ),
+        ):
+            if "follow-prerequisite" not in matched:
+                matched.append("follow-prerequisite")
+    return ContextProof("following-empty", tuple(matched), "follow-prerequisite" in matched)
+
+
 def find_comments_node(xml: str, *, package: str | None = None) -> UiNode:
     """Find the passive comments-entry control on the current feed item."""
     candidates: list[UiNode] = []

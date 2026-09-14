@@ -7,9 +7,14 @@ Supported features are intentionally passive:
 - open comments, dwell, and return;
 - explore a keyword or hashtag, dwell, and return to the qualified feed.
 
-Every action starts from the qualified feed selector and, where the action is
-supposed to return, proves the same feed selector after returning. Tap targets
-come from fresh runtime hierarchy bounds; missing/ambiguous controls fail closed.
+Every action is bootstrapped to the already-qualified For You feed before
+execution. This matters because TikTok may reopen in Following, Search, Profile,
+or another transient context where the FYP anchor is correctly absent.
+
+Following is treated as an excursion: enter Following, prove TikTok remains in a
+feed-like context, dwell, then explicitly return to For You and prove the
+qualified candidate again. Tap targets come from fresh runtime hierarchy bounds;
+missing/ambiguous controls fail closed.
 """
 from __future__ import annotations
 
@@ -35,7 +40,7 @@ from genfarmer_automation.hierarchy_runtime import (  # noqa: E402
     HierarchyRuntimeError,
     capture_hierarchy_batch,
 )
-from genfarmer_automation.native_ui import NativeUiError  # noqa: E402
+from genfarmer_automation.native_ui import NativeUiError, NativeUiNotFound  # noqa: E402
 from genfarmer_automation.permission_recovery import recover_tiktok_permission_dialog  # noqa: E402
 from genfarmer_automation.selector_gate import assess_selector_gate  # noqa: E402
 from genfarmer_automation.tiktok_runtime import TikTokRuntime  # noqa: E402
@@ -96,6 +101,76 @@ def _feed_gate(device: str, candidate, *, preferred_port: int):
     batch = _capture(device, preferred_port=preferred_port, count=2)
     gate = assess_selector_gate(candidate, batch.snapshots, package=TIKTOK_PACKAGE)
     return gate, batch
+
+
+def _bootstrap_qualified_fyp(
+    *,
+    device: str,
+    actions: AdbActions,
+    observer: AdbObserver,
+    candidate,
+    preferred_port: int,
+    apply: bool,
+    max_backs: int = 3,
+):
+    """Return (recovery_actions, gate, batch) after proving qualified FYP.
+
+    The qualified anchor is FYP-specific evidence. Its absence is therefore not
+    immediately an error: TikTok may simply have reopened in another legitimate
+    context. We first try the current screen, then a visible For You tab, then a
+    small bounded BACK recovery. We never guess coordinates.
+    """
+    last_counts = None
+    recovery_actions = 0
+
+    for attempt in range(max_backs + 1):
+        try:
+            gate, batch = _feed_gate(device, candidate, preferred_port=preferred_port)
+            last_counts = gate.counts
+            if gate.passed:
+                return recovery_actions, gate, batch
+            xml = batch.snapshots[-1]
+        except HierarchyRuntimeError:
+            xml = _capture(device, preferred_port=preferred_port, count=1).snapshots[0]
+
+        try:
+            for_you = find_feed_source_node(xml, "for-you", package=TIKTOK_PACKAGE)
+        except NativeUiError:
+            for_you = None
+
+        if for_you is not None:
+            if not apply:
+                raise RuntimeError(
+                    f"qualified FYP anchor is absent (counts={last_counts}) but For You is recoverable; use --apply"
+                )
+            actions.tap(*for_you.center)
+            recovery_actions += 1
+            time.sleep(1.5)
+            if not _ready(observer):
+                raise RuntimeError("TikTok became unhealthy while bootstrapping For You feed")
+            try:
+                gate, batch = _feed_gate(device, candidate, preferred_port=preferred_port)
+                last_counts = gate.counts
+                if gate.passed:
+                    return recovery_actions, gate, batch
+            except HierarchyRuntimeError:
+                pass
+
+        if attempt == max_backs:
+            break
+        if not apply:
+            break
+        actions.keyevent(4)
+        recovery_actions += 1
+        time.sleep(1.0)
+        if not _ready(observer):
+            recovered = TikTokRuntime(device, observer=observer).ensure_foreground()
+            if not recovered.success:
+                raise RuntimeError(f"foreground recovery during FYP bootstrap failed: {recovered.reason}")
+
+    raise RuntimeError(
+        f"qualified For You feed could not be restored with bounded semantic/BACK recovery; last counts={last_counts}"
+    )
 
 
 def _return_to_feed(
@@ -197,9 +272,14 @@ def main() -> int:
         observer = AdbObserver(args.device)
         actions = AdbActions(args.device)
         permission_recoveries = _ensure_ready(args.device, observer, apply=args.apply)
-        pre_gate, pre_batch = _feed_gate(args.device, candidate, preferred_port=args.preferred_hierarchy_port)
-        if not pre_gate.passed:
-            raise RuntimeError(f"qualified feed precondition failed with counts {pre_gate.counts}")
+        bootstrap_actions, pre_gate, pre_batch = _bootstrap_qualified_fyp(
+            device=args.device,
+            actions=actions,
+            observer=observer,
+            candidate=candidate,
+            preferred_port=args.preferred_hierarchy_port,
+            apply=args.apply,
+        )
         (private / "feed-before.xml").write_text(pre_batch.snapshots[-1], encoding="utf-8")
         observer.capture_screenshot(private / "before.png")
 
@@ -224,6 +304,7 @@ def main() -> int:
                 "target_kind": target_kind,
                 "target_resolved": target is not None or args.feature in {"keyword", "hashtag"},
                 "permission_recoveries": permission_recoveries,
+                "fyp_bootstrap_actions": bootstrap_actions,
             }
         )
 
@@ -243,17 +324,62 @@ def main() -> int:
             print("=" * 78)
             return 0
 
-        if args.feature in {"for-you", "following"}:
+        if args.feature == "for-you":
+            # Bootstrap already proved the qualified For You feed. Tapping the tab
+            # is unnecessary if TikTok reopened there, but do it once when a target
+            # exists to qualify the semantic control itself.
             actions.tap(*target.center)
-            time.sleep(max(1.5, min(dwell, 5.0)))
+            time.sleep(max(1.0, min(dwell, 3.0)))
             post_gate, post_batch = _feed_gate(args.device, candidate, preferred_port=args.preferred_hierarchy_port)
             if not post_gate.passed:
-                raise RuntimeError(f"feed source tap did not retain a qualified feed; counts={post_gate.counts}")
+                raise RuntimeError(f"For You tap did not retain qualified FYP; counts={post_gate.counts}")
             observer.capture_screenshot(private / "after-source.png")
             result.update(
                 {
                     "status": "PASS",
-                    "context_verified": "qualified_feed_after_source_tap",
+                    "context_verified": "qualified_fyp_after_for_you_tap",
+                    "post_feed_counts": list(post_gate.counts),
+                    "post_feed_provider": post_batch.provider,
+                }
+            )
+
+        elif args.feature == "following":
+            # Candidate 8 was qualified for FYP, not assumed universal across the
+            # Following feed. Enter Following, prove a feed-like passive context,
+            # dwell, then explicitly return to For You and prove candidate 8.
+            actions.tap(*target.center)
+            time.sleep(1.8)
+            if not _ready(observer):
+                raise RuntimeError("TikTok became unhealthy after Following tap")
+            following_batch = _capture(args.device, preferred_port=args.preferred_hierarchy_port, count=1)
+            following_xml = following_batch.snapshots[0]
+            (private / "following-context.xml").write_text(following_xml, encoding="utf-8")
+            observer.capture_screenshot(private / "following-context.png")
+            find_feed_source_node(following_xml, "following", package=TIKTOK_PACKAGE)
+            feed_affordance = False
+            try:
+                find_comments_node(following_xml, package=TIKTOK_PACKAGE)
+                feed_affordance = True
+            except NativeUiError:
+                try:
+                    find_creator_profile_entry(following_xml, package=TIKTOK_PACKAGE)
+                    feed_affordance = True
+                except NativeUiError:
+                    pass
+            if not feed_affordance:
+                raise RuntimeError("Following control is visible but a feed-like content affordance was not proven")
+            time.sleep(dwell)
+            for_you = find_feed_source_node(following_xml, "for-you", package=TIKTOK_PACKAGE)
+            actions.tap(*for_you.center)
+            time.sleep(1.5)
+            post_gate, post_batch = _feed_gate(args.device, candidate, preferred_port=args.preferred_hierarchy_port)
+            if not post_gate.passed:
+                raise RuntimeError(f"return from Following did not restore qualified FYP; counts={post_gate.counts}")
+            result.update(
+                {
+                    "status": "PASS",
+                    "context_verified": "following_feed_excursion_then_qualified_fyp_return",
+                    "following_provider": following_batch.provider,
                     "post_feed_counts": list(post_gate.counts),
                     "post_feed_provider": post_batch.provider,
                 }
@@ -332,6 +458,7 @@ def main() -> int:
         if "post_feed_counts" in result:
             print(f"Feed post-counts:           {tuple(result['post_feed_counts'])}")
         print(f"Dwell:                      {dwell:.2f}s")
+        print(f"FYP bootstrap actions:      {bootstrap_actions}")
         print("Engagement actions:         NONE")
         print(f"Private evidence:           {private.relative_to(ROOT)}")
         print(f"Shareable result:           {shareable.relative_to(ROOT)}")

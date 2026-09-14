@@ -86,13 +86,18 @@ def main() -> int:
             output = proc.stdout or ""
             (private / f"{index:02d}-{row.feature}.log").write_text(output, encoding="utf-8", errors="replace")
             payload = load_shareable(ROOT, output)
-            expected = "PASS" if args.apply else "DRY_RUN_READY"
-            passed = proc.returncode == 0 and payload is not None and payload.get("status") == expected
+            status = payload.get("status") if payload else "NO_RESULT"
+            if args.apply:
+                accepted = {"PASS", "SKIP_PREREQUISITE"}
+            else:
+                accepted = {"DRY_RUN_READY"}
+            passed = proc.returncode == 0 and payload is not None and status in accepted
             result["results"].append(
                 {
                     "feature": row.feature,
-                    "status": payload.get("status") if payload else "NO_RESULT",
+                    "status": status,
                     "passed": passed,
+                    "skip_reason": payload.get("skip_reason") if payload else None,
                 }
             )
             if not passed:
@@ -103,15 +108,23 @@ def main() -> int:
                 print(f"ERROR: feature matrix blocked at {row.feature}", file=sys.stderr)
                 print(f"Shareable result: {shareable.relative_to(ROOT)}", file=sys.stderr)
                 return 1
-            print(f"  PASS {row.feature}")
+            if status == "SKIP_PREREQUISITE":
+                print(f"  SKIP {row.feature} prerequisite={payload.get('skip_reason')}")
+            else:
+                print(f"  PASS {row.feature}")
 
         result["status"] = "PASS" if args.apply else "DRY_RUN_READY"
+        qualified = sum(1 for item in result["results"] if item["status"] in {"PASS", "DRY_RUN_READY"})
+        skipped = sum(1 for item in result["results"] if item["status"] == "SKIP_PREREQUISITE")
+        result["qualified_features"] = qualified
+        result["prerequisite_skips"] = skipped
         _write_json(shareable, result)
         print("=" * 78)
         print("TIKTOK WARM-UP FEATURE MATRIX")
         print("=" * 78)
         print(f"Status:                     {result['status']}")
-        print(f"Features passed:            {len(rows)}/{len(rows)}")
+        print(f"Features qualified:         {qualified}/{len(rows)}")
+        print(f"Prerequisite skips:         {skipped}")
         print("Engagement actions:         NONE")
         print(f"Private logs:               {private.relative_to(ROOT)}")
         print(f"Shareable result:           {shareable.relative_to(ROOT)}")

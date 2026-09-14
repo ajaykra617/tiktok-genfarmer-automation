@@ -13,8 +13,10 @@ or another transient context where the FYP anchor is correctly absent.
 
 Following is treated as an excursion: enter Following, prove TikTok remains in a
 feed-like context, dwell, then explicitly return to For You and prove the
-qualified candidate again. Tap targets come from fresh runtime hierarchy bounds;
-missing/ambiguous controls fail closed.
+qualified candidate again. A legitimate empty Following screen is classified as
+a prerequisite skip; the automation never follows accounts to manufacture data.
+Tap targets come from fresh runtime hierarchy bounds; missing/ambiguous controls
+fail closed.
 """
 from __future__ import annotations
 
@@ -48,6 +50,7 @@ from genfarmer_automation.warmup_features import (  # noqa: E402
     find_comments_node,
     find_creator_profile_entry,
     find_feed_source_node,
+    following_empty_state,
     prove_comments_context,
     prove_profile_context,
 )
@@ -325,9 +328,6 @@ def main() -> int:
             return 0
 
         if args.feature == "for-you":
-            # Bootstrap already proved the qualified For You feed. Tapping the tab
-            # is unnecessary if TikTok reopened there, but do it once when a target
-            # exists to qualify the semantic control itself.
             actions.tap(*target.center)
             time.sleep(max(1.0, min(dwell, 3.0)))
             post_gate, post_batch = _feed_gate(args.device, candidate, preferred_port=args.preferred_hierarchy_port)
@@ -344,9 +344,6 @@ def main() -> int:
             )
 
         elif args.feature == "following":
-            # Candidate 8 was qualified for FYP, not assumed universal across the
-            # Following feed. Enter Following, prove a feed-like passive context,
-            # dwell, then explicitly return to For You and prove candidate 8.
             actions.tap(*target.center)
             time.sleep(1.8)
             if not _ready(observer):
@@ -356,34 +353,65 @@ def main() -> int:
             (private / "following-context.xml").write_text(following_xml, encoding="utf-8")
             observer.capture_screenshot(private / "following-context.png")
             find_feed_source_node(following_xml, "following", package=TIKTOK_PACKAGE)
-            feed_affordance = False
-            try:
-                find_comments_node(following_xml, package=TIKTOK_PACKAGE)
-                feed_affordance = True
-            except NativeUiError:
+
+            empty_proof = following_empty_state(following_xml, package=TIKTOK_PACKAGE)
+            if empty_proof.passed:
+                for_you = find_feed_source_node(following_xml, "for-you", package=TIKTOK_PACKAGE)
+                actions.tap(*for_you.center)
+                time.sleep(1.5)
+                post_gate, post_batch = _feed_gate(
+                    args.device,
+                    candidate,
+                    preferred_port=args.preferred_hierarchy_port,
+                )
+                if not post_gate.passed:
+                    raise RuntimeError(
+                        f"empty Following prerequisite was detected but return to FYP failed; counts={post_gate.counts}"
+                    )
+                result.update(
+                    {
+                        "status": "SKIP_PREREQUISITE",
+                        "skip_reason": "following_feed_empty",
+                        "context_verified": "following_empty_prerequisite_then_qualified_fyp_return",
+                        "context_indicators": list(empty_proof.matched_terms),
+                        "following_provider": following_batch.provider,
+                        "post_feed_counts": list(post_gate.counts),
+                        "post_feed_provider": post_batch.provider,
+                    }
+                )
+            else:
+                feed_affordance = False
                 try:
-                    find_creator_profile_entry(following_xml, package=TIKTOK_PACKAGE)
+                    find_comments_node(following_xml, package=TIKTOK_PACKAGE)
                     feed_affordance = True
                 except NativeUiError:
-                    pass
-            if not feed_affordance:
-                raise RuntimeError("Following control is visible but a feed-like content affordance was not proven")
-            time.sleep(dwell)
-            for_you = find_feed_source_node(following_xml, "for-you", package=TIKTOK_PACKAGE)
-            actions.tap(*for_you.center)
-            time.sleep(1.5)
-            post_gate, post_batch = _feed_gate(args.device, candidate, preferred_port=args.preferred_hierarchy_port)
-            if not post_gate.passed:
-                raise RuntimeError(f"return from Following did not restore qualified FYP; counts={post_gate.counts}")
-            result.update(
-                {
-                    "status": "PASS",
-                    "context_verified": "following_feed_excursion_then_qualified_fyp_return",
-                    "following_provider": following_batch.provider,
-                    "post_feed_counts": list(post_gate.counts),
-                    "post_feed_provider": post_batch.provider,
-                }
-            )
+                    try:
+                        find_creator_profile_entry(following_xml, package=TIKTOK_PACKAGE)
+                        feed_affordance = True
+                    except NativeUiError:
+                        pass
+                if not feed_affordance:
+                    raise RuntimeError("Following control is visible but a feed-like content affordance was not proven")
+                time.sleep(dwell)
+                for_you = find_feed_source_node(following_xml, "for-you", package=TIKTOK_PACKAGE)
+                actions.tap(*for_you.center)
+                time.sleep(1.5)
+                post_gate, post_batch = _feed_gate(
+                    args.device,
+                    candidate,
+                    preferred_port=args.preferred_hierarchy_port,
+                )
+                if not post_gate.passed:
+                    raise RuntimeError(f"return from Following did not restore qualified FYP; counts={post_gate.counts}")
+                result.update(
+                    {
+                        "status": "PASS",
+                        "context_verified": "following_feed_excursion_then_qualified_fyp_return",
+                        "following_provider": following_batch.provider,
+                        "post_feed_counts": list(post_gate.counts),
+                        "post_feed_provider": post_batch.provider,
+                    }
+                )
 
         elif args.feature in {"profile", "comments"}:
             actions.tap(*target.center)
@@ -451,12 +479,14 @@ def main() -> int:
         print("TIKTOK WARM-UP FEATURE")
         print("=" * 78)
         print("Mode:                       APPLY")
-        print("Status:                     PASS")
+        print(f"Status:                     {result['status']}")
         print(f"Feature:                    {args.feature}")
         print(f"Context verification:       {result.get('context_verified')}")
         print(f"Feed pre-counts:            {tuple(result['pre_feed_counts'])}")
         if "post_feed_counts" in result:
             print(f"Feed post-counts:           {tuple(result['post_feed_counts'])}")
+        if result.get("skip_reason"):
+            print(f"Prerequisite skip:          {result['skip_reason']}")
         print(f"Dwell:                      {dwell:.2f}s")
         print(f"FYP bootstrap actions:      {bootstrap_actions}")
         print("Engagement actions:         NONE")

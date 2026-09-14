@@ -5,6 +5,7 @@ from genfarmer_automation.warmup_features import (
     find_comments_node,
     find_creator_profile_entry,
     find_feed_source_node,
+    following_empty_state,
     prove_comments_context,
     prove_profile_context,
 )
@@ -37,6 +38,22 @@ def test_feed_source_finds_exact_following():
     )
     assert find_feed_source_node(doc, "following").text == "Following"
     assert find_feed_source_node(doc, "fyp").text == "For You"
+
+
+def test_following_empty_state_matches_observed_prerequisite_screen():
+    doc = xml(
+        node(text="Trending creators"),
+        node(text="Follow an account to see their latest videos here.", bounds="[0,100][500,200]"),
+    )
+    proof = following_empty_state(doc)
+    assert proof.passed
+    assert proof.kind == "following-empty"
+    assert "follow-prerequisite" in proof.matched_terms
+
+
+def test_following_empty_state_does_not_match_normal_feed():
+    proof = following_empty_state(xml(node(**{"content-desc": "Comments 42"})))
+    assert not proof.passed
 
 
 def test_creator_entry_uses_avatar_not_bottom_profile_tab():

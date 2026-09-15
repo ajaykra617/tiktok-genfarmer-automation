@@ -1,6 +1,10 @@
 import pytest
 
-from genfarmer_automation.warm_scroll import WarmScrollError, build_warm_scroll_plan
+from genfarmer_automation.warm_scroll import (
+    WarmScrollError,
+    build_warm_scroll_plan,
+    is_transient_bootstrap_failure,
+)
 
 
 def test_seeded_warm_scroll_plan_is_reproducible():
@@ -54,3 +58,30 @@ def test_warm_scroll_plan_caps_short_boost_session():
             seed=1,
             max_session_minutes=16,
         )
+
+
+def test_transient_bootstrap_failure_accepts_hierarchy_unavailable_reason():
+    assert is_transient_bootstrap_failure(
+        {
+            "status": "BLOCKED",
+            "reason": "no healthy hierarchy source after helper-service recovery and fallback",
+        }
+    )
+
+
+def test_transient_bootstrap_failure_accepts_no_counts_fyp_recovery_reason():
+    assert is_transient_bootstrap_failure(
+        {
+            "status": "BLOCKED",
+            "reason": (
+                "qualified For You feed could not be restored with bounded semantic/BACK recovery; "
+                "last counts=None"
+            ),
+        }
+    )
+
+
+def test_transient_bootstrap_failure_rejects_semantic_failure():
+    assert not is_transient_bootstrap_failure(
+        {"status": "BLOCKED", "reason": "For You tap did not retain qualified FYP; counts=(0, 0)"}
+    )

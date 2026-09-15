@@ -30,7 +30,11 @@ from genfarmer_automation.hierarchy_runtime import HierarchyRuntimeError, captur
 from genfarmer_automation.permission_recovery import recover_tiktok_permission_dialog  # noqa: E402
 from genfarmer_automation.selector_gate import assess_selector_gate  # noqa: E402
 from genfarmer_automation.tiktok_runtime import TikTokRuntime  # noqa: E402
-from genfarmer_automation.warm_scroll import WarmScrollError, build_warm_scroll_plan  # noqa: E402
+from genfarmer_automation.warm_scroll import (  # noqa: E402
+    WarmScrollError,
+    build_warm_scroll_plan,
+    is_transient_bootstrap_failure,
+)
 from genfarmer_automation.warmup_session import load_shareable  # noqa: E402
 
 TIKTOK_PACKAGE = "com.zhiliaoapp.musically"
@@ -85,7 +89,8 @@ def _feed_gate(device: str, candidate, preferred_port: int):
     return gate, batch
 
 
-def _bootstrap_fyp(candidates: Path, candidate: int, device: str, preferred_port: int, private: Path) -> None:
+def _bootstrap_fyp(candidates: Path, candidate: int, device: str, preferred_port: int, private: Path) -> int:
+    """Bootstrap qualified FYP, retrying once only for hierarchy unavailability."""
     cmd = [
         sys.executable,
         str(ROOT / "scripts" / "tiktok_warmup_feature.py"),
@@ -99,20 +104,47 @@ def _bootstrap_fyp(candidates: Path, candidate: int, device: str, preferred_port
         "--seed", "1",
         "--apply",
     ]
-    proc = subprocess.run(
-        cmd,
-        cwd=ROOT,
-        text=True,
-        stdout=subprocess.PIPE,
-        stderr=subprocess.STDOUT,
-        timeout=180.0,
-        check=False,
-    )
-    output = proc.stdout or ""
-    (private / "bootstrap-fyp.log").write_text(output, encoding="utf-8", errors="replace")
-    payload = load_shareable(ROOT, output)
-    if proc.returncode != 0 or not isinstance(payload, dict) or payload.get("status") != "PASS":
-        raise RuntimeError("qualified For You bootstrap did not reach PASS")
+
+    final_payload = None
+    final_output = ""
+    final_returncode = 1
+    retries = 0
+
+    for attempt in range(1, 3):
+        proc = subprocess.run(
+            cmd,
+            cwd=ROOT,
+            text=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            timeout=180.0,
+            check=False,
+        )
+        output = proc.stdout or ""
+        (private / f"bootstrap-fyp-attempt-{attempt:02d}.log").write_text(
+            output, encoding="utf-8", errors="replace"
+        )
+        payload = load_shareable(ROOT, output)
+        final_payload = payload if isinstance(payload, dict) else None
+        final_output = output
+        final_returncode = proc.returncode
+
+        if final_returncode == 0 and isinstance(final_payload, dict) and final_payload.get("status") == "PASS":
+            (private / "bootstrap-fyp.log").write_text(output, encoding="utf-8", errors="replace")
+            return retries
+
+        if attempt >= 2 or not is_transient_bootstrap_failure(final_payload):
+            break
+
+        retries += 1
+        print("FYP bootstrap: transient hierarchy failure; retrying once")
+        time.sleep(1.25)
+
+    (private / "bootstrap-fyp.log").write_text(final_output, encoding="utf-8", errors="replace")
+    reason = final_payload.get("reason") if isinstance(final_payload, dict) else None
+    if isinstance(reason, str) and reason.strip():
+        raise RuntimeError(f"qualified For You bootstrap did not reach PASS: {reason}")
+    raise RuntimeError("qualified For You bootstrap did not reach PASS")
 
 
 def main() -> int:
@@ -178,7 +210,13 @@ def main() -> int:
         observer = AdbObserver(args.device)
         actions = AdbActions(args.device)
         permission_recoveries = _ensure_ready(args.device, observer)
-        _bootstrap_fyp(args.candidates, args.candidate, args.device, args.preferred_hierarchy_port, private)
+        bootstrap_retries = _bootstrap_fyp(
+            args.candidates,
+            args.candidate,
+            args.device,
+            args.preferred_hierarchy_port,
+            private,
+        )
         started = time.monotonic()
         providers: set[str] = set()
 
@@ -213,6 +251,7 @@ def main() -> int:
                 "status": "PASS",
                 "completed_videos": plan.videos,
                 "permission_recoveries": permission_recoveries,
+                "bootstrap_transient_retries": bootstrap_retries,
                 "hierarchy_providers": sorted(providers),
                 "action_backend": "adb_relative_swipe",
             }
@@ -223,6 +262,7 @@ def main() -> int:
         print("=" * 78)
         print("Status:                     PASS")
         print(f"Completed videos:           {plan.videos}/{plan.videos}")
+        print(f"Bootstrap retries:          {bootstrap_retries}")
         print("Feed verification:          QUALIFIED ANCHOR BEFORE/AFTER EACH SWIPE")
         print("Engagement actions:         NONE")
         print("Publishing UI:              NOT ENTERED")

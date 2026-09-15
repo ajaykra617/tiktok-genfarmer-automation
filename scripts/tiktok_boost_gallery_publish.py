@@ -6,6 +6,12 @@ media ingestion. It expects TikTok's Upload gallery to be open. The approved fil
 is staged and resolved in MediaStore, then the exact visible media tile is chosen
 by its MediaStore-derived duration. Ambiguous same-duration tiles fail closed.
 
+The picker intentionally stays on TikTok's default All tab. Earlier code tried to
+switch to the Videos tab first, but current TikTok builds can expose duplicate
+accessibility nodes for that label. Since media selection is already constrained
+by the exact staged video duration, changing tabs adds no safety and can introduce
+false ambiguity.
+
 Actual final publishing still requires both --apply and --publish.
 """
 from __future__ import annotations
@@ -164,6 +170,7 @@ def main() -> int:
         "publish_permitted": bool(args.publish),
         "candidate_index": args.candidate,
         "engagement_actions": 0,
+        "gallery_filter": "all",
     }
 
     try:
@@ -222,17 +229,9 @@ def main() -> int:
             raise RuntimeError("Boost write path requires explicit --ready")
         actions = AdbActions(args.device)
 
-        # Prefer the Videos tab so image tiles cannot compete with video selection.
-        try:
-            videos = find_exact_semantic_node(xml, ("Videos",), package=TIKTOK_PACKAGE)
-        except NativeUiNotFound:
-            videos = None
-        if videos is not None:
-            _tap(actions, videos)
-            time.sleep(1.0)
-            xml, provider = _capture(args.device, args.preferred_hierarchy_port)
-            (private / "gallery-videos.xml").write_text(xml, encoding="utf-8")
-
+        # Stay on TikTok's default All tab. Exact duration matching already
+        # constrains selection to the staged video and avoids duplicate Videos
+        # accessibility labels observed on this build.
         tile = find_unique_duration_tile(xml, duration_ms=duration_ms, package=TIKTOK_PACKAGE)
         actions.tap(*tile.center)
         time.sleep(1.0)

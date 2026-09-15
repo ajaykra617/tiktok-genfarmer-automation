@@ -21,27 +21,24 @@ Do not commit client-specific:
 
 Keep those in ignored local configuration/evidence.
 
-Use `config/boost-phase-a-runtime.example.json` only as a template. Put real device ids, LAN addresses, proxy URLs, account labels, and media paths in `config/boost-phase-a-runtime.local.json`, which is ignored by git.
-
-## Phase A readiness gate
-
-`src/genfarmer_automation/proxy_readiness.py` provides vendor-neutral fail-closed checks for each configured HTTP proxy endpoint:
-
-1. parse an explicit `http://host:port` endpoint;
-2. prove the TCP listener is reachable;
-3. in apply mode, route an external HTTP(S) request through that proxy;
-4. require the response to contain a parseable external IP.
-
-The external IP is private runtime evidence. It is not written into the shareable wave result.
-
-`scripts/run_boost_phase_a_waves.py` validates the logical schedule before launch, checks every proxy used by a wave, starts tasks concurrently inside that wave, and enforces a hard barrier before the next wave. A failure in one task stops all later waves. The existing schedule policy additionally prevents two concurrent devices from using the same proxy identity for the same application.
-
-Apply mode requires `--ip-check-url`; TCP reachability alone is intentionally insufficient for a proxy-required live run.
-
-## Still deferred
-
-The current readiness gate proves the host can reach the configured XProxy HTTP endpoint and obtain real egress through it. It does **not** yet claim that the Android device's TikTok traffic has been switched to that proxy or that XProxy modem rotation has occurred. Device-route assignment/rotation remains a separate qualification step and must not be inferred from the host-side readiness result.
-
 ## Current engineering note
 
-One XProxy position has previously been reported live/working by the operator. Treat that as a strong readiness signal, but promote a position only after the external HTTP(S) egress gate passes and the observed external IP is recorded in ignored local evidence.
+The Phase A scheduler and standalone proxy qualifier now enforce a fail-closed
+network gate before proxy-required device work starts. The gate distinguishes
+listener reachability from real internet egress and only qualifies a lane after
+an external-IP endpoint succeeds through the configured HTTP proxy.
+
+Live qualification on 2026-09-15 established that the tested HTTP proxy listener
+was reachable, while the external HTTP(S) request timed out. Therefore the proxy
+lane remains **blocked for apply-mode automation**: an open TCP port alone is not
+accepted as proof of mobile internet availability. This result is consistent with
+a modem/SIM/upstream-data-path problem, a proxy egress problem, or an HTTPS CONNECT
+problem; the application automation layer should not guess which one.
+
+Use the standalone qualifier first. Only after it reports TCP PASS, HTTP(S) egress
+PASS and an external IP should the apply-mode wave executor be used. The executor
+must continue to stop before touching a device when this gate is not satisfied.
+
+A later device-route qualification is still required to prove that TikTok traffic
+on Android is actually routed through the selected proxy; host-to-proxy egress
+qualification does not by itself prove Android application routing.

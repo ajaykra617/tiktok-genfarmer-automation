@@ -31,6 +31,20 @@ def test_unique_duration_tile():
     assert tile.center == (150, 500)
 
 
+def test_duration_selection_ignores_duplicate_gallery_tab_labels():
+    xml = (
+        '<hierarchy>'
+        f'<node package="{PKG}" text="Videos" content-desc="Videos" clickable="true" enabled="true" bounds="[250,200][520,318]" />'
+        f'<node package="{PKG}" text="Videos" content-desc="Videos" clickable="true" enabled="true" bounds="[520,200][780,318]" />'
+        f'<node package="{PKG}" clickable="true" enabled="true" bounds="[0,318][300,700]">'
+        f'<node package="{PKG}" class="android.widget.TextView" text="00:03" clickable="false" enabled="true" bounds="[150,620][250,680]" />'
+        '</node>'
+        '</hierarchy>'
+    )
+    tile = find_unique_duration_tile(xml, duration_ms=3000, package=PKG)
+    assert tile.center == (150, 509)
+
+
 def test_duration_tile_ambiguous_fails_closed():
     try:
         find_unique_duration_tile(_xml("00:03", "00:03"), duration_ms=3000, package=PKG)

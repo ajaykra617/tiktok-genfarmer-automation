@@ -1,41 +1,40 @@
 {
-  "prepare_keyword": {
-    "phase": "prepare_only",
-    "warm_scroll_videos": 3,
-    "explore_type": "keyword",
-    "explore_value": "example niche",
-    "candidate": 8,
-    "duplicate_guard": true,
-    "account_ready_required": true,
-    "reserve_one_media": true,
-    "stage_media": true,
-    "publish": false
+  "presets": {
+    "phase_a_standard": {
+      "warm_scroll_videos": 0,
+      "lease_minutes": 120,
+      "explore": {
+        "selection": "random",
+        "sources": [
+          {"type": "keyword", "value": "technology"},
+          {"type": "hashtag", "value": "technology"}
+        ]
+      }
+    },
+    "phase_a_warm_then_explore": {
+      "warm_scroll_videos": 3,
+      "lease_minutes": 120,
+      "explore": {
+        "selection": "random",
+        "sources": [
+          {"type": "keyword", "value": "technology"},
+          {"type": "hashtag", "value": "technology"},
+          {"type": "account", "value": "example_creator"},
+          {"type": "link", "value": "https://www.tiktok.com/"}
+        ]
+      }
+    },
+    "phase_a_prepare_only": {
+      "warm_scroll_videos": 0,
+      "lease_minutes": 120,
+      "explore": {
+        "selection": "first",
+        "sources": []
+      }
+    }
   },
-  "prepare_hashtag": {
-    "phase": "prepare_only",
-    "warm_scroll_videos": 0,
-    "explore_type": "hashtag",
-    "explore_value": "example niche",
-    "candidate": 8,
-    "duplicate_guard": true,
-    "account_ready_required": true,
-    "reserve_one_media": true,
-    "stage_media": true,
-    "publish": false
-  },
-  "prepare_only": {
-    "phase": "prepare_only",
-    "warm_scroll_videos": 0,
-    "candidate": 8,
-    "duplicate_guard": true,
-    "account_ready_required": true,
-    "reserve_one_media": true,
-    "stage_media": true,
-    "publish": false
-  },
-  "deferred_publish_research": {
-    "phase": "deferred",
-    "reason": "TikTok Create/Upload/editor/final Post UI remains under live qualification",
-    "publish": false
+  "publishing": {
+    "status": "deferred",
+    "note": "Create/Upload/Post UI qualification is intentionally outside Phase A."
   }
 }

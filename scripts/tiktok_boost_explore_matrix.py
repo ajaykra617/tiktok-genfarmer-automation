@@ -3,8 +3,10 @@
 
 Each requested source is run through the existing `tiktok_boost_explore.py`
 controller. Failures are recorded per source and the matrix continues, so one UI
-variant does not hide evidence for the remaining passive source types. No likes,
-follows, replies, DMs, Create/Upload UI, or Post action are performed.
+variant does not hide evidence for the remaining passive source types. A single
+bounded retry is allowed only for the known transient hierarchy bootstrap failure
+seen during live GF#7 qualification. No likes, follows, replies, DMs,
+Create/Upload UI, or Post action are performed.
 """
 from __future__ import annotations
 
@@ -15,6 +17,7 @@ from pathlib import Path
 import re
 import subprocess
 import sys
+import time
 from typing import Any
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -25,6 +28,7 @@ if str(SRC) not in sys.path:
 from genfarmer_automation.boost_explore_matrix import (  # noqa: E402
     BoostExploreMatrixError,
     child_passed,
+    is_transient_hierarchy_failure,
     matrix_summary,
     normalize_sources,
 )
@@ -34,6 +38,25 @@ from genfarmer_automation.warmup_session import load_shareable  # noqa: E402
 def _write_json(path: Path, value: Any) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(value, ensure_ascii=False, indent=2), encoding="utf-8")
+
+
+def _run_child(cmd: list[str]) -> tuple[int, str]:
+    try:
+        proc = subprocess.run(
+            cmd,
+            cwd=ROOT,
+            text=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            timeout=240.0,
+            check=False,
+        )
+        return proc.returncode, proc.stdout or ""
+    except subprocess.TimeoutExpired as exc:
+        output = exc.stdout or ""
+        if isinstance(output, bytes):
+            output = output.decode("utf-8", errors="replace")
+        return 124, str(output) + "\nERROR: Explore child timed out\n"
 
 
 def main() -> int:
@@ -85,50 +108,75 @@ def main() -> int:
         if args.apply:
             cmd.append("--apply")
 
-        try:
-            proc = subprocess.run(
-                cmd,
-                cwd=ROOT,
-                text=True,
-                stdout=subprocess.PIPE,
-                stderr=subprocess.STDOUT,
-                timeout=240.0,
-                check=False,
-            )
-            output = proc.stdout or ""
-            returncode = proc.returncode
-        except subprocess.TimeoutExpired as exc:
-            output = exc.stdout or ""
-            if isinstance(output, bytes):
-                output = output.decode("utf-8", errors="replace")
-            output = str(output) + "\nERROR: Explore child timed out\n"
-            returncode = 124
+        final_returncode = 124
+        final_output = ""
+        final_payload: dict[str, Any] | None = None
+        retry_count = 0
 
+        for attempt in range(1, 3):
+            returncode, output = _run_child(cmd)
+            (private / f"source-{index:02d}-{source.source_type}-attempt-{attempt:02d}.log").write_text(
+                output, encoding="utf-8", errors="replace"
+            )
+            payload = load_shareable(ROOT, output)
+            if not isinstance(payload, dict):
+                payload = None
+
+            final_returncode = returncode
+            final_output = output
+            final_payload = payload
+
+            expected = "PASS" if args.apply else "DRY_RUN_READY"
+            passed = (
+                child_passed(returncode, payload)
+                if args.apply
+                else returncode == 0 and isinstance(payload, dict) and payload.get("status") == expected
+            )
+            if passed:
+                break
+
+            if not args.apply or attempt >= 2 or not is_transient_hierarchy_failure(payload):
+                break
+
+            retry_count += 1
+            print(
+                f"[{index}/{len(sources)}] {source.source_type}: transient hierarchy bootstrap failure; "
+                "retrying once"
+            )
+            time.sleep(1.25)
+
+        # Stable convenience log for operators who want the final child attempt.
         (private / f"source-{index:02d}-{source.source_type}.log").write_text(
-            output, encoding="utf-8", errors="replace"
+            final_output, encoding="utf-8", errors="replace"
         )
-        payload = load_shareable(ROOT, output)
+
         expected = "PASS" if args.apply else "DRY_RUN_READY"
         passed = (
-            child_passed(returncode, payload)
+            child_passed(final_returncode, final_payload)
             if args.apply
-            else returncode == 0 and isinstance(payload, dict) and payload.get("status") == expected
+            else final_returncode == 0
+            and isinstance(final_payload, dict)
+            and final_payload.get("status") == expected
         )
-        status = str(payload.get("status")) if isinstance(payload, dict) else "MISSING_RESULT"
+        status = str(final_payload.get("status")) if isinstance(final_payload, dict) else "MISSING_RESULT"
         row = {
             "index": index,
             "source_type": source.source_type,
             "source_value_private": True,
             "status": status,
             "passed": passed,
+            "transient_retry_count": retry_count,
         }
-        if isinstance(payload, dict):
-            row["context_verified"] = payload.get("context_verified")
-            row["specialized_tab_selected"] = payload.get("specialized_tab_selected")
-            if not passed and payload.get("reason"):
-                row["reason"] = payload.get("reason")
+        if isinstance(final_payload, dict):
+            row["context_verified"] = final_payload.get("context_verified")
+            row["specialized_tab_selected"] = final_payload.get("specialized_tab_selected")
+            if not passed and final_payload.get("reason"):
+                row["reason"] = final_payload.get("reason")
         rows.append(row)
-        print(f"[{index}/{len(sources)}] {source.source_type}: {'PASS' if passed else 'BLOCKED'} status={status}")
+        print(
+            f"[{index}/{len(sources)}] {source.source_type}: "
+            f"{'PASS' if passed else 'BLOCKED'} status={status} retries={retry_count}"
+        )
 
     (private / "sources.private.json").write_text(
         json.dumps(private_sources, ensure_ascii=False, indent=2), encoding="utf-8"

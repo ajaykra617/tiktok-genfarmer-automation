@@ -20,7 +20,12 @@ SRC = ROOT / "src"
 if str(SRC) not in sys.path:
     sys.path.insert(0, str(SRC))
 
-from genfarmer_automation.proxy_readiness import ProxyReadinessError, probe_http_proxy  # noqa: E402
+from genfarmer_automation.proxy_readiness import (  # noqa: E402
+    ProxyReadinessError,
+    parse_http_proxy,
+    probe_http_proxy,
+    tcp_reachable,
+)
 
 
 def _write_json(path: Path, value) -> None:
@@ -52,9 +57,18 @@ def main() -> int:
         "proxy_id_private": True,
         "proxy_url_private": True,
         "check_url": args.check_url,
+        "tcp_reachable": False,
+        "egress_verified": False,
+        "external_ip_detected": False,
     }
 
     try:
+        endpoint = parse_http_proxy(args.proxy_url)
+        tcp_ok = tcp_reachable(endpoint, timeout=min(args.timeout, 3.0))
+        result["tcp_reachable"] = tcp_ok
+        if not tcp_ok:
+            raise ProxyReadinessError("proxy TCP endpoint is unreachable")
+
         readiness = probe_http_proxy(args.proxy_url, check_url=args.check_url, timeout=args.timeout)
         if not readiness.ready or not readiness.external_ip:
             raise ProxyReadinessError("proxy did not reach fully qualified egress state")
@@ -93,8 +107,16 @@ def main() -> int:
     except (OSError, ValueError, ProxyReadinessError) as exc:
         result.update({"status": "BLOCKED", "reason": str(exc)})
         _write_json(shareable, result)
-        print(f"ERROR: {exc}", file=sys.stderr)
-        print(f"Shareable result: {shareable.relative_to(ROOT)}", file=sys.stderr)
+        print("=" * 78, file=sys.stderr)
+        print("XPROXY EGRESS QUALIFICATION", file=sys.stderr)
+        print("=" * 78, file=sys.stderr)
+        print("Status:                     BLOCKED", file=sys.stderr)
+        print(f"TCP endpoint:               {'PASS' if result['tcp_reachable'] else 'FAIL'}", file=sys.stderr)
+        print("HTTP(S) egress:             FAIL", file=sys.stderr)
+        print("External IP detected:       NO", file=sys.stderr)
+        print(f"Reason:                     {exc}", file=sys.stderr)
+        print(f"Shareable result:           {shareable.relative_to(ROOT)}", file=sys.stderr)
+        print("=" * 78, file=sys.stderr)
         return 1
 
 

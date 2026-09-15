@@ -9,4 +9,6 @@ logs/*
 !logs/.gitkeep
 config/device-map.local.yaml
 config/local.yaml
+config/boost-phase-a-runtime.local.json
+config/boost-phase-a-waves.local.json
 .vscode/settings.json

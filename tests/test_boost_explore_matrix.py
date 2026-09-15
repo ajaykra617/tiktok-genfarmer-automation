@@ -3,6 +3,7 @@ import pytest
 from genfarmer_automation.boost_explore_matrix import (
     BoostExploreMatrixError,
     child_passed,
+    is_transient_hierarchy_failure,
     matrix_summary,
     normalize_sources,
 )
@@ -32,6 +33,27 @@ def test_child_passed_requires_zero_returncode_and_pass_status():
     assert child_passed(1, {"status": "PASS"}) is False
     assert child_passed(0, {"status": "BLOCKED"}) is False
     assert child_passed(0, None) is False
+
+
+def test_transient_hierarchy_failure_is_retryable():
+    payload = {
+        "status": "BLOCKED",
+        "reason": "no healthy hierarchy source after helper-service recovery and compressed/standard uiautomator fallback",
+    }
+    assert is_transient_hierarchy_failure(payload) is True
+
+
+@pytest.mark.parametrize(
+    "payload",
+    [
+        None,
+        {"status": "PASS"},
+        {"status": "BLOCKED", "reason": "configured query was not proven"},
+        {"status": "BLOCKED"},
+    ],
+)
+def test_non_hierarchy_failures_are_not_retryable(payload):
+    assert is_transient_hierarchy_failure(payload) is False
 
 
 def test_matrix_summary_is_pass_only_when_every_requested_source_passes():

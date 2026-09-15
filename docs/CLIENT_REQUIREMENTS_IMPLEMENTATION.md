@@ -78,12 +78,12 @@ Requirement | TikTok status
 ---|---
 READY gate | Implemented and live-qualified
 Saved presets | Implemented and live-qualified
-Optional warm scroll before Boost | Implemented in preset/prepare orchestration; warm variant still needs a dedicated live qualification run
-Explore Random | Implemented as deterministic seeded selection from configured source pools; preset selection live-qualified
-Explore Keywords | Implemented and live-qualified
-Explore Link | Implemented; live qualification pending
-Explore Hashtag | Implemented; underlying hashtag navigation is qualified, Boost-specific run still pending
-Explore Account list | Implemented as configured account sources; live qualification pending
+Optional warm scroll before Boost | Standalone 3-video qualified warm scroll live-passed with feed-anchor proof before/after every swipe; saved-preset integration no longer requires a `.genfarm` export
+Explore Random | Implemented as deterministic seeded selection from configured source pools
+Explore Keywords | Live-qualified
+Explore Link | Live-qualified
+Explore Hashtag | Live-qualified
+Explore Account list | Live-qualified
 Approved video/photo input | File/folder discovery supports approved video and image formats
 One media preparation per device/job | Implemented
 Never same media concurrently across devices | Enforced by atomic SHA-256 preparation leases
@@ -93,6 +93,10 @@ MediaStore staging | Implemented and live-qualified for video
 Audit logging/evidence | Implemented
 Multi-device wave/barrier execution | Implemented; single-device live qualification passed
 Distribution spacing between waves | Implemented as configurable randomized interval
+
+The Boost Explore qualification matrix live-passed all four supported passive source types on the primary healthy device: keyword, hashtag, account and link. No engagement or publishing UI was entered.
+
+The standalone Boost warm scroll also live-passed 3/3 videos with bounded 5-10 second watch timing and the qualified FYP anchor proven before and after every swipe. Saved preset orchestration now calls this standalone controller directly, so `phase_a_warm_then_explore` only needs the ranked candidate file rather than a compiled `.genfarm` export.
 
 The live Phase A terminal state is `READY_FOR_PUBLISH`. At that point the selected media remains reserved until a later publish succeeds or an operator explicitly releases the preparation lease.
 
@@ -142,9 +146,9 @@ Runtime/private logs may contain account or device identifiers and remain ignore
 
 ## Current qualification order
 
-1. Keep the XProxy apply lane blocked until real external egress/public IP returns.
-2. Qualify the Boost warm-scroll preset and remaining Link/Account/Boost-specific Hashtag Explore variants.
-3. Exercise a multi-device dry-run with separate approved media per device to prove concurrent reservation/barrier behavior without requiring proxy egress.
+1. Run `phase_a_warm_then_explore` end to end on the primary healthy device through `READY_FOR_PUBLISH`, then release the disposable media lease.
+2. Identify a second healthy device and give it separate approved media plus a distinct proxy identity for same-app wave testing.
+3. Exercise multi-device dry-run/barrier scheduling; keep apply-mode proxy-required waves blocked while XProxy egress is unhealthy.
 4. Finish mixed Warm-up orchestration (mainly FYP plus occasional passive excursions).
 5. Return to normal TikTok Create -> Upload/Gallery publishing after additional UI research.
 6. Once XProxy is healthy, qualify host proxy egress, then Android device routing, then multi-device apply waves.

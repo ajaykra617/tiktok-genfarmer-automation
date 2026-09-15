@@ -12,6 +12,7 @@ from typing import Iterable, Mapping, Any
 
 
 _ALLOWED_TYPES = {"keyword", "hashtag", "account", "link"}
+_TRANSIENT_HIERARCHY_REASON = "no healthy hierarchy source after helper-service recovery"
 
 
 class BoostExploreMatrixError(ValueError):
@@ -46,6 +47,22 @@ def normalize_sources(items: Iterable[tuple[str, str]]) -> tuple[ExploreSource, 
 
 def child_passed(returncode: int, payload: Mapping[str, Any] | None) -> bool:
     return returncode == 0 and isinstance(payload, Mapping) and payload.get("status") == "PASS"
+
+
+def is_transient_hierarchy_failure(payload: Mapping[str, Any] | None) -> bool:
+    """Return True only for the known cold/wedged hierarchy bootstrap failure.
+
+    We intentionally do not retry semantic/UI failures. The live GF#7 matrix
+    showed the first source failing because every hierarchy provider was briefly
+    unavailable, immediately followed by healthy hierarchy captures for later
+    sources. One bounded retry is therefore safe and targeted.
+    """
+    if not isinstance(payload, Mapping):
+        return False
+    if payload.get("status") != "BLOCKED":
+        return False
+    reason = payload.get("reason")
+    return isinstance(reason, str) and _TRANSIENT_HIERARCHY_REASON in reason
 
 
 def matrix_summary(rows: Iterable[Mapping[str, Any]]) -> dict[str, Any]:

@@ -21,8 +21,8 @@ def test_build_warm_scroll_command_uses_candidates_without_genfarm():
         apply=True,
     )
     joined = " ".join(cmd)
-    assert "tiktok_boost_warm_scroll.py" in joined
-    assert "evidence/candidates.json" in joined
+    assert Path(cmd[1]).name == "tiktok_boost_warm_scroll.py"
+    assert Path(cmd[2]) == Path("evidence/candidates.json")
     assert "--videos 3" in joined
     assert "--seed 42" in joined
     assert "--apply" in cmd

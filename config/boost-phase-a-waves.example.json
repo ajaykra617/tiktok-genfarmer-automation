@@ -1,0 +1,36 @@
+{
+  "interval_minutes": [30, 73],
+  "waves": [
+    {
+      "name": "wave-1",
+      "tasks": [
+        {
+          "device": "GF#7",
+          "app": "tiktok",
+          "mode": "boost_prepare",
+          "proxy_id": "xproxy-pos-1",
+          "preset": "phase_a_standard"
+        },
+        {
+          "device": "GF#8",
+          "app": "tiktok",
+          "mode": "boost_prepare",
+          "proxy_id": "xproxy-pos-2",
+          "preset": "phase_a_standard"
+        }
+      ]
+    },
+    {
+      "name": "wave-2",
+      "tasks": [
+        {
+          "device": "GF#9",
+          "app": "tiktok",
+          "mode": "boost_prepare",
+          "proxy_id": "xproxy-pos-1",
+          "preset": "phase_a_prepare_only"
+        }
+      ]
+    }
+  ]
+}

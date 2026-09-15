@@ -2,9 +2,10 @@
 """Run TikTok Boost Phase A from a saved non-publishing preset.
 
 The preset may choose one passive Explore source from a configured pool using a
-recorded deterministic seed. The selected source is passed to
-`tiktok_boost_prepare.py`, which stops at READY_FOR_PUBLISH and never enters the
-Create/Upload/Post UI.
+recorded deterministic seed.  Presets that request a warm scroll now use the
+qualified standalone `tiktok_boost_warm_scroll.py` controller, so no compiled
+`.genfarm` export is required.  Preparation still stops at READY_FOR_PUBLISH and
+never enters the Create/Upload/Post UI.
 """
 from __future__ import annotations
 
@@ -22,6 +23,10 @@ SRC = ROOT / "src"
 if str(SRC) not in sys.path:
     sys.path.insert(0, str(SRC))
 
+from genfarmer_automation.boost_preset_runtime import (  # noqa: E402
+    build_warm_scroll_command,
+    expected_warm_scroll_status,
+)
 from genfarmer_automation.boost_sources import (  # noqa: E402
     BoostSourceError,
     choose_source,
@@ -34,6 +39,27 @@ from genfarmer_automation.warmup_session import load_shareable  # noqa: E402
 def _write_json(path: Path, value) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(value, ensure_ascii=False, indent=2), encoding="utf-8")
+
+
+def _run(cmd: list[str], *, timeout: float) -> subprocess.CompletedProcess[str]:
+    return subprocess.run(
+        cmd,
+        cwd=ROOT,
+        text=True,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
+        timeout=timeout,
+        check=False,
+    )
+
+
+def _child_error(output: str, fallback: str) -> str:
+    detail = (output or "").strip().splitlines()
+    if len(detail) >= 2:
+        return detail[-2]
+    if detail:
+        return detail[-1]
+    return fallback
 
 
 def main() -> int:
@@ -51,7 +77,11 @@ def main() -> int:
     ap.add_argument("--reservations", type=Path)
     ap.add_argument("--candidate", type=int, default=8)
     ap.add_argument("--candidates", type=Path)
-    ap.add_argument("--warmup-compiled", type=Path)
+    ap.add_argument(
+        "--warmup-compiled",
+        type=Path,
+        help="legacy compatibility option; saved-preset warm scroll no longer requires a .genfarm export",
+    )
     ap.add_argument("--preferred-hierarchy-port", type=int, default=8912)
     ap.add_argument("--seed", type=int)
     ap.add_argument("--ready", action="store_true")
@@ -93,6 +123,7 @@ def main() -> int:
         result["preset_summary"] = preset_summary(preset)
         result["selected_source_index"] = source_index
         result["selected_source_type"] = source.source_type if source else None
+
         # Source values stay private; record them only in private evidence.
         (private / "selection.private.json").write_text(
             json.dumps(
@@ -110,6 +141,37 @@ def main() -> int:
             encoding="utf-8",
         )
 
+        warm_scroll_status = "NOT_REQUESTED"
+        if preset.warm_scroll_videos:
+            if args.candidates is None:
+                raise BoostSourceError(
+                    "preset warm scroll requires --candidates; a compiled .genfarm export is no longer required"
+                )
+            warm_cmd = build_warm_scroll_command(
+                python_executable=sys.executable,
+                root=ROOT,
+                candidates=args.candidates,
+                candidate=args.candidate,
+                device=args.device,
+                videos=preset.warm_scroll_videos,
+                seed=seed,
+                preferred_hierarchy_port=args.preferred_hierarchy_port,
+                apply=args.apply,
+            )
+            warm = _run(warm_cmd, timeout=600.0)
+            warm_output = warm.stdout or ""
+            (private / "warm-scroll.log").write_text(warm_output, encoding="utf-8", errors="replace")
+            warm_child = load_shareable(ROOT, warm_output)
+            expected_warm = expected_warm_scroll_status(apply=args.apply)
+            if warm.returncode != 0 or warm_child is None or warm_child.get("status") != expected_warm:
+                raise RuntimeError(
+                    "Boost preset warm scroll blocked: "
+                    + _child_error(warm_output, "warm-scroll child did not return a result")
+                )
+            warm_scroll_status = expected_warm
+
+        # Warm scroll is orchestrated above.  The preparation child owns Explore,
+        # duplicate guard, atomic reservation and exact Android media staging.
         cmd = [
             sys.executable,
             str(ROOT / "scripts" / "tiktok_boost_prepare.py"),
@@ -118,7 +180,7 @@ def main() -> int:
             "--lease-minutes", str(preset.lease_minutes),
             "--candidate", str(args.candidate),
             "--preferred-hierarchy-port", str(args.preferred_hierarchy_port),
-            "--warm-scroll-videos", str(preset.warm_scroll_videos),
+            "--warm-scroll-videos", "0",
         ]
         for path in args.media:
             cmd.extend(["--media", str(path)])
@@ -132,10 +194,6 @@ def main() -> int:
             cmd.extend(["--history", str(args.history)])
         if args.reservations:
             cmd.extend(["--reservations", str(args.reservations)])
-        if args.candidates:
-            cmd.extend(["--candidates", str(args.candidates)])
-        if args.warmup_compiled:
-            cmd.extend(["--warmup-compiled", str(args.warmup_compiled)])
         if source:
             cmd.extend(["--explore-type", source.source_type, "--explore-value", source.value])
         if args.ready:
@@ -143,21 +201,15 @@ def main() -> int:
         if args.apply:
             cmd.append("--apply")
 
-        proc = subprocess.run(
-            cmd,
-            cwd=ROOT,
-            text=True,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.STDOUT,
-            timeout=900.0,
-            check=False,
-        )
-        (private / "prepare.log").write_text(proc.stdout or "", encoding="utf-8", errors="replace")
-        child = load_shareable(ROOT, proc.stdout or "")
+        proc = _run(cmd, timeout=900.0)
+        prepare_output = proc.stdout or ""
+        (private / "prepare.log").write_text(prepare_output, encoding="utf-8", errors="replace")
+        child = load_shareable(ROOT, prepare_output)
         if proc.returncode != 0 or child is None:
-            detail = (proc.stdout or "").strip().splitlines()
-            last = detail[-2] if len(detail) >= 2 else (detail[-1] if detail else "unknown error")
-            raise RuntimeError(f"Boost Phase A preset child run blocked: {last}")
+            raise RuntimeError(
+                "Boost Phase A preset child run blocked: "
+                + _child_error(prepare_output, "prepare child did not return a result")
+            )
 
         status = str(child.get("status"))
         expected = "READY_FOR_PUBLISH" if args.apply else "DRY_RUN_READY"
@@ -167,7 +219,7 @@ def main() -> int:
             {
                 "status": status,
                 "child_status": status,
-                "warm_scroll_status": child.get("warm_scroll_status"),
+                "warm_scroll_status": warm_scroll_status,
                 "explore_status": child.get("explore_status"),
                 "duplicate_guard_pass": child.get("duplicate_guard_pass"),
                 "media_reserved": child.get("media_reserved"),
@@ -185,6 +237,7 @@ def main() -> int:
         print(f"Seed:                       {seed}")
         print(f"Explore source:             {source.source_type if source else 'NOT REQUESTED'}")
         print(f"Warm scroll videos:         {preset.warm_scroll_videos}")
+        print(f"Warm scroll status:         {warm_scroll_status}")
         print("Publishing UI:              DEFERRED / NOT ENTERED")
         print("Final Post action:          NONE")
         print(f"Private evidence:           {private.relative_to(ROOT)}")
@@ -192,7 +245,7 @@ def main() -> int:
         print("=" * 78)
         return 0
 
-    except (OSError, json.JSONDecodeError, BoostSourceError, RuntimeError, subprocess.TimeoutExpired) as exc:
+    except (OSError, json.JSONDecodeError, BoostSourceError, RuntimeError, ValueError, subprocess.TimeoutExpired) as exc:
         result["status"] = "BLOCKED"
         result["reason"] = str(exc)
         _write_json(shareable, result)

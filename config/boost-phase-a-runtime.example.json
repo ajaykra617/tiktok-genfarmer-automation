@@ -28,6 +28,7 @@
     "preset_config": "config/tiktok-boost-presets.example.json",
     "reservations": "evidence/boost-preparation-leases.private",
     "history": "evidence/boost-history.private.json",
+    "candidates": "evidence/LOCAL_FEED_ANCHOR_RUN/private/ranked-candidates.private.json",
     "preferred_hierarchy_port": 8912
   }
 }

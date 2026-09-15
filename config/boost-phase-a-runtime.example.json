@@ -1,0 +1,33 @@
+{
+  "devices": {
+    "GF#7": {
+      "adb_id": "DEVICE_7_IP:5555",
+      "media_dirs": ["C:/approved-media/gf7"],
+      "account_key": "local-account-label-7"
+    },
+    "GF#8": {
+      "adb_id": "DEVICE_8_IP:5555",
+      "media_dirs": ["C:/approved-media/gf8"],
+      "account_key": "local-account-label-8"
+    },
+    "GF#9": {
+      "adb_id": "DEVICE_9_IP:5555",
+      "media_dirs": ["C:/approved-media/gf9"],
+      "account_key": "local-account-label-9"
+    }
+  },
+  "proxies": {
+    "xproxy-pos-1": {
+      "http_url": "http://XPROXY_LAN_IP:HTTP_PORT_1"
+    },
+    "xproxy-pos-2": {
+      "http_url": "http://XPROXY_LAN_IP:HTTP_PORT_2"
+    }
+  },
+  "defaults": {
+    "preset_config": "config/tiktok-boost-presets.example.json",
+    "reservations": "evidence/boost-preparation-leases.private",
+    "history": "evidence/boost-history.private.json",
+    "preferred_hierarchy_port": 8912
+  }
+}

@@ -24,7 +24,11 @@ if str(SRC) not in sys.path:
     sys.path.insert(0, str(SRC))
 
 from genfarmer_automation.adb_actions import AdbActions, AdbActionError  # noqa: E402
-from genfarmer_automation.adb_observer import AdbObserver, InterruptKind  # noqa: E402
+from genfarmer_automation.adb_observer import (  # noqa: E402
+    AdbObservationError,
+    AdbObserver,
+    InterruptKind,
+)
 from genfarmer_automation.feed_anchor_qualification import candidates_from_payload  # noqa: E402
 from genfarmer_automation.hierarchy_runtime import HierarchyRuntimeError, capture_hierarchy_batch  # noqa: E402
 from genfarmer_automation.permission_recovery import recover_tiktok_permission_dialog  # noqa: E402
@@ -245,7 +249,17 @@ def main() -> int:
             providers.add(post_batch.provider)
             print(f"  PASS pre={pre_gate.counts} post={post_gate.counts}")
 
-        observer.capture_screenshot(private / "after.png")
+        # The semantic postcondition above is the qualification gate.  A final
+        # screenshot is useful evidence but is not itself a correctness signal;
+        # do not convert a fully verified warm scroll into a false failure just
+        # because a trailing screencap command times out or briefly disconnects.
+        screenshot_captured = False
+        try:
+            observer.capture_screenshot(private / "after.png")
+            screenshot_captured = True
+        except AdbObservationError:
+            pass
+
         result.update(
             {
                 "status": "PASS",
@@ -254,6 +268,7 @@ def main() -> int:
                 "bootstrap_transient_retries": bootstrap_retries,
                 "hierarchy_providers": sorted(providers),
                 "action_backend": "adb_relative_swipe",
+                "final_screenshot_captured": screenshot_captured,
             }
         )
         _write_json(shareable, result)
@@ -264,6 +279,7 @@ def main() -> int:
         print(f"Completed videos:           {plan.videos}/{plan.videos}")
         print(f"Bootstrap retries:          {bootstrap_retries}")
         print("Feed verification:          QUALIFIED ANCHOR BEFORE/AFTER EACH SWIPE")
+        print(f"Final screenshot:           {'CAPTURED' if screenshot_captured else 'UNAVAILABLE / NON-BLOCKING'}")
         print("Engagement actions:         NONE")
         print("Publishing UI:              NOT ENTERED")
         print(f"Private evidence:           {private.relative_to(ROOT)}")
@@ -271,7 +287,16 @@ def main() -> int:
         print("=" * 78)
         return 0
 
-    except (OSError, json.JSONDecodeError, ValueError, RuntimeError, WarmScrollError, HierarchyRuntimeError, AdbActionError) as exc:
+    except (
+        OSError,
+        json.JSONDecodeError,
+        ValueError,
+        RuntimeError,
+        WarmScrollError,
+        HierarchyRuntimeError,
+        AdbActionError,
+        AdbObservationError,
+    ) as exc:
         result["status"] = "BLOCKED"
         result["reason"] = str(exc)
         _write_json(shareable, result)

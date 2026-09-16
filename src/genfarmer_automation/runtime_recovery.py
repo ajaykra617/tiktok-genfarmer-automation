@@ -1,8 +1,8 @@
 """Shared runtime failure classification for bounded Android/TikTok recovery.
 
-This module deliberately separates *classification* from *mutation*.  Callers
+This module deliberately separates *classification* from *mutation*. Callers
 may use the returned recovery action to decide whether a read-only retry,
-foreground restore, or bounded app restart is appropriate.  Semantic/UI
+foreground restore, or bounded app restart is appropriate. Semantic/UI
 failures that are not positively recognized remain fail-closed.
 """
 from __future__ import annotations
@@ -79,8 +79,7 @@ class RecoveryBudget:
     def can_attempt(self, decision: RecoveryDecision) -> bool:
         if not decision.retryable:
             return False
-        limit = self.limit_for(decision.action)
-        return self.used.get(decision.action, 0) < limit
+        return self.used.get(decision.action, 0) < self.limit_for(decision.action)
 
     def consume(self, decision: RecoveryDecision) -> bool:
         if not self.can_attempt(decision):
@@ -106,14 +105,8 @@ _ADB_TRANSIENT_MARKERS = (
     "device unauthorized",
     "no devices/emulators found",
     "transport error",
-    "closed",
-)
-
-_APP_HUNG_MARKERS = (
-    "app_not_responding",
-    "application not responding",
-    "not responding",
-    "\banr\b",
+    "transport closed",
+    "connection closed",
 )
 
 

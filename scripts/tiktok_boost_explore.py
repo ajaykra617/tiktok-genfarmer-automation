@@ -5,6 +5,10 @@ This is account-local discovery only. It performs no likes, follows, replies,
 DMs, or cross-account engagement. Search controls are resolved from fresh native
 hierarchy bounds; link exploration uses Android's explicit VIEW intent targeted
 to the authorized TikTok package.
+
+Runtime recovery is bounded and shared with the rest of the automation engine.
+Only read-only observation/hierarchy operations may be retried. UI mutations
+(taps, text entry, ENTER) are never automatically replayed after a timeout.
 """
 from __future__ import annotations
 
@@ -23,7 +27,7 @@ if str(SRC) not in sys.path:
     sys.path.insert(0, str(SRC))
 
 from genfarmer_automation.adb_actions import AdbActions, AdbActionError  # noqa: E402
-from genfarmer_automation.adb_observer import AdbObserver, InterruptKind  # noqa: E402
+from genfarmer_automation.adb_observer import AdbObservationError, AdbObserver  # noqa: E402
 from genfarmer_automation.hierarchy_runtime import HierarchyRuntimeError, capture_hierarchy_batch  # noqa: E402
 from genfarmer_automation.native_ui import (  # noqa: E402
     NativeUiError,
@@ -33,7 +37,10 @@ from genfarmer_automation.native_ui import (  # noqa: E402
     find_exact_semantic_node,
     find_semantic_node,
 )
-from genfarmer_automation.tiktok_runtime import TikTokRuntime  # noqa: E402
+from genfarmer_automation.runtime_supervisor import (  # noqa: E402
+    RuntimeSupervisorError,
+    TikTokRuntimeSupervisor,
+)
 
 TIKTOK_PACKAGE = "com.zhiliaoapp.musically"
 
@@ -55,11 +62,6 @@ def _capture(device: str, preferred_port: int) -> tuple[str, str]:
     return batch.snapshots[0], batch.provider
 
 
-def _foreground_ok(observer: AdbObserver) -> bool:
-    obs = observer.observe()
-    return obs.adb_state == "device" and obs.tiktok_foreground and obs.interrupt is InterruptKind.NONE
-
-
 def _open_link(device: str, url: str) -> None:
     if not re.match(r"^https?://", url, re.IGNORECASE):
         raise ValueError("link explore source must be an http(s) URL")
@@ -78,6 +80,8 @@ def _open_link(device: str, url: str) -> None:
     except FileNotFoundError as exc:
         raise RuntimeError("adb was not found in PATH") from exc
     except subprocess.TimeoutExpired as exc:
+        # Do not replay this mutation automatically: the intent may already have
+        # been delivered even though the host-side command timed out.
         raise RuntimeError("TikTok link intent timed out") from exc
     if proc.returncode != 0:
         raise RuntimeError(proc.stderr.decode(errors="replace").strip() or "TikTok link intent failed")
@@ -146,49 +150,66 @@ def main() -> int:
         print("=" * 78)
         return 0
 
+    supervisor = None
     try:
         observer = AdbObserver(args.device)
         actions = AdbActions(args.device)
+        supervisor = TikTokRuntimeSupervisor(args.device, observer=observer, actions=actions)
+        supervisor.ensure_ready(apply=True)
 
         if args.type == "link":
             _open_link(args.device, raw_value)
             time.sleep(4.0)
-            if not _foreground_ok(observer):
-                raise RuntimeError("TikTok foreground/no-interrupt state not proven after link intent")
-            observer.capture_screenshot(private / "link-context.png")
+            supervisor.ensure_ready(apply=True)
+
+            screenshot_captured = False
             try:
-                xml, provider = _capture(args.device, args.preferred_hierarchy_port)
+                observer.capture_screenshot(private / "link-context.png")
+                screenshot_captured = True
+            except AdbObservationError:
+                pass
+
+            try:
+                xml, provider = supervisor.run_read_only(
+                    lambda: _capture(args.device, args.preferred_hierarchy_port)
+                )
                 (private / "link-context.xml").write_text(xml, encoding="utf-8")
             except HierarchyRuntimeError:
+                # Link qualification only requires TikTok foreground proof. The
+                # hierarchy is useful evidence but not the link correctness gate.
                 provider = None
             result.update(
                 {
                     "status": "PASS",
                     "context_verified": "tiktok_foreground",
                     "hierarchy_provider": provider,
+                    "screenshot_captured": screenshot_captured,
                 }
             )
         else:
-            if not _foreground_ok(observer):
-                recovered = TikTokRuntime(args.device, observer=observer).ensure_foreground()
-                if not recovered.success:
-                    raise RuntimeError(f"foreground recovery failed: {recovered.reason}")
-
-            xml, provider = _capture(args.device, args.preferred_hierarchy_port)
+            xml, provider = supervisor.run_read_only(
+                lambda: _capture(args.device, args.preferred_hierarchy_port)
+            )
             (private / "feed-before-search.xml").write_text(xml, encoding="utf-8")
             search = find_semantic_node(xml, ("Search",), package=TIKTOK_PACKAGE)
             actions.tap(*search.center)
             time.sleep(1.5)
+            supervisor.ensure_ready(apply=True)
 
-            xml, provider2 = _capture(args.device, args.preferred_hierarchy_port)
+            xml, provider2 = supervisor.run_read_only(
+                lambda: _capture(args.device, args.preferred_hierarchy_port)
+            )
             (private / "search-entry.xml").write_text(xml, encoding="utf-8")
             edit = find_editable_node(xml, package=TIKTOK_PACKAGE, hints=("Search",))
             actions.tap(*edit.center)
             actions.input_text(query)
             actions.keyevent(66)  # ENTER
             time.sleep(3.0)
+            supervisor.ensure_ready(apply=True)
 
-            xml, provider3 = _capture(args.device, args.preferred_hierarchy_port)
+            xml, provider3 = supervisor.run_read_only(
+                lambda: _capture(args.device, args.preferred_hierarchy_port)
+            )
             (private / "search-results.xml").write_text(xml, encoding="utf-8")
             tab_selected = False
             if args.type == "hashtag":
@@ -197,7 +218,10 @@ def main() -> int:
                     actions.tap(*tab.center)
                     tab_selected = True
                     time.sleep(1.5)
-                    xml, provider3 = _capture(args.device, args.preferred_hierarchy_port)
+                    supervisor.ensure_ready(apply=True)
+                    xml, provider3 = supervisor.run_read_only(
+                        lambda: _capture(args.device, args.preferred_hierarchy_port)
+                    )
                 except NativeUiNotFound:
                     pass
             elif args.type == "account":
@@ -206,13 +230,21 @@ def main() -> int:
                     actions.tap(*tab.center)
                     tab_selected = True
                     time.sleep(1.5)
-                    xml, provider3 = _capture(args.device, args.preferred_hierarchy_port)
+                    supervisor.ensure_ready(apply=True)
+                    xml, provider3 = supervisor.run_read_only(
+                        lambda: _capture(args.device, args.preferred_hierarchy_port)
+                    )
                 except NativeUiNotFound:
                     pass
 
-            if not _foreground_ok(observer):
-                raise RuntimeError("TikTok foreground/no-interrupt state not proven after search")
-            observer.capture_screenshot(private / "explore-context.png")
+            supervisor.ensure_ready(apply=True)
+            screenshot_captured = False
+            try:
+                observer.capture_screenshot(private / "explore-context.png")
+                screenshot_captured = True
+            except AdbObservationError:
+                pass
+
             query_proven = _query_visible(xml, query)
             if not query_proven:
                 raise RuntimeError("search completed but configured query was not proven in the fresh UI hierarchy")
@@ -222,9 +254,11 @@ def main() -> int:
                     "context_verified": "query_visible",
                     "specialized_tab_selected": tab_selected,
                     "hierarchy_providers": sorted({provider, provider2, provider3}),
+                    "screenshot_captured": screenshot_captured,
                 }
             )
 
+        result["recovery_budget_used"] = supervisor.snapshot().recovery_budget_used
         _write_json(shareable, result)
         print("=" * 78)
         print("TIKTOK BOOST EXPLORE")
@@ -232,15 +266,26 @@ def main() -> int:
         print("Status:                     PASS")
         print(f"Source type:                {args.type}")
         print(f"Context verification:       {result['context_verified']}")
+        print(f"Recovery budget used:       {result['recovery_budget_used']}")
         print("Engagement actions:         NONE")
         print(f"Private evidence:           {private.relative_to(ROOT)}")
         print(f"Shareable result:           {shareable.relative_to(ROOT)}")
         print("=" * 78)
         return 0
 
-    except (RuntimeError, ValueError, AdbActionError, HierarchyRuntimeError, NativeUiError) as exc:
+    except (
+        RuntimeError,
+        ValueError,
+        AdbActionError,
+        AdbObservationError,
+        HierarchyRuntimeError,
+        NativeUiError,
+        RuntimeSupervisorError,
+    ) as exc:
         result["status"] = "BLOCKED"
         result["reason"] = str(exc)
+        if supervisor is not None:
+            result["recovery_budget_used"] = supervisor.snapshot().recovery_budget_used
         _write_json(shareable, result)
         print(f"ERROR: {exc}", file=sys.stderr)
         print(f"Shareable result: {shareable.relative_to(ROOT)}", file=sys.stderr)

@@ -4,8 +4,10 @@
 This controller is for Boost Phase A preparation. It bootstraps the already-
 qualified For You feed through the passive warm-up feature runner, then performs
 bounded device-relative swipes. Every swipe is guarded by the qualified feed
-anchor before and after the action. No likes, follows, replies, DMs, Create UI,
-or Post action are performed.
+anchor before and after the action. Runtime recovery is deliberately bounded:
+known ANR, hierarchy, ADB, permission, and foreground-loss conditions may be
+recovered within a small session budget; semantic/UI mismatches still fail
+closed. No likes, follows, replies, DMs, Create UI, or Post action are performed.
 """
 from __future__ import annotations
 
@@ -27,11 +29,17 @@ from genfarmer_automation.adb_actions import AdbActions, AdbActionError  # noqa:
 from genfarmer_automation.adb_observer import (  # noqa: E402
     AdbObservationError,
     AdbObserver,
-    InterruptKind,
 )
 from genfarmer_automation.feed_anchor_qualification import candidates_from_payload  # noqa: E402
 from genfarmer_automation.hierarchy_runtime import HierarchyRuntimeError, capture_hierarchy_batch  # noqa: E402
 from genfarmer_automation.permission_recovery import recover_tiktok_permission_dialog  # noqa: E402
+from genfarmer_automation.runtime_recovery import (  # noqa: E402
+    RecoveryAction,
+    RecoveryBudget,
+    RecoveryLimits,
+    classify_error,
+    classify_observation,
+)
 from genfarmer_automation.selector_gate import assess_selector_gate  # noqa: E402
 from genfarmer_automation.tiktok_runtime import TikTokRuntime  # noqa: E402
 from genfarmer_automation.warm_scroll import (  # noqa: E402
@@ -49,46 +57,70 @@ def _write_json(path: Path, value) -> None:
     path.write_text(json.dumps(value, ensure_ascii=False, indent=2), encoding="utf-8")
 
 
-def _ready(observer: AdbObserver) -> bool:
-    obs = observer.observe()
-    return obs.adb_state == "device" and obs.tiktok_foreground and obs.interrupt is InterruptKind.NONE
-
-
-def _ensure_ready(device: str, observer: AdbObserver) -> int:
+def _ensure_ready(device: str, observer: AdbObserver, budget: RecoveryBudget) -> int:
+    """Prove healthy TikTok state, applying only classified bounded recovery."""
     recoveries = 0
-    for _ in range(3):
-        obs = observer.observe()
-        if obs.interrupt is InterruptKind.ANDROID_PERMISSION_DIALOG:
+    for _ in range(5):
+        try:
+            obs = observer.observe()
+        except AdbObservationError as exc:
+            decision = classify_error(exc)
+            if decision.action is RecoveryAction.RETRY_ADB and budget.consume(decision):
+                time.sleep(0.75)
+                continue
+            raise RuntimeError(f"{decision.kind.value}: {decision.reason}") from exc
+
+        decision = classify_observation(obs)
+        if decision.action is RecoveryAction.NONE:
+            return recoveries
+
+        if decision.action is RecoveryAction.RECOVER_PERMISSION:
+            if not budget.consume(decision):
+                raise RuntimeError("permission recovery budget exhausted")
             recovered = recover_tiktok_permission_dialog(device, observer=observer)
             if not recovered.success:
                 raise RuntimeError(f"permission recovery failed: {recovered.reason}")
             recoveries += int(recovered.handled)
             continue
-        if obs.interrupt is not InterruptKind.NONE:
-            raise RuntimeError(f"Android interrupt blocks warm scroll: {obs.interrupt.value}")
-        if obs.adb_state != "device":
-            raise RuntimeError("ADB device is not ready")
-        if obs.tiktok_foreground:
-            return recoveries
-        restored = TikTokRuntime(device, observer=observer).ensure_foreground()
-        if not restored.success:
-            raise RuntimeError(f"TikTok foreground recovery failed: {restored.reason}")
-    if not _ready(observer):
-        raise RuntimeError("TikTok foreground/no-interrupt state was not restored")
-    return recoveries
+
+        if decision.action in {RecoveryAction.RESTART_APP, RecoveryAction.RESTORE_FOREGROUND}:
+            if not budget.consume(decision):
+                raise RuntimeError(f"{decision.action.value} recovery budget exhausted")
+            restored = TikTokRuntime(device, observer=observer).ensure_foreground()
+            if not restored.success:
+                raise RuntimeError(f"TikTok runtime recovery failed: {restored.reason}")
+            recoveries += restored.attempts
+            continue
+
+        raise RuntimeError(f"{decision.kind.value}: {decision.reason}")
+
+    raise RuntimeError("TikTok foreground/no-interrupt state was not restored within bounded recovery")
 
 
-def _feed_gate(device: str, candidate, preferred_port: int):
-    batch = capture_hierarchy_batch(
-        device,
-        count=2,
-        interval=0.12,
-        preferred_port=preferred_port,
-        helper_timeout=4.0,
-        max_ports=12,
-    )
+def _feed_gate(device: str, candidate, preferred_port: int, budget: RecoveryBudget):
+    """Capture and verify the qualified feed, retrying only transient hierarchy loss."""
+    while True:
+        try:
+            batch = capture_hierarchy_batch(
+                device,
+                count=2,
+                interval=0.12,
+                preferred_port=preferred_port,
+                helper_timeout=4.0,
+                max_ports=12,
+            )
+            break
+        except HierarchyRuntimeError as exc:
+            decision = classify_error(exc)
+            if decision.action is RecoveryAction.RETRY_HIERARCHY and budget.consume(decision):
+                time.sleep(0.9)
+                continue
+            raise
+
     gate = assess_selector_gate(candidate, batch.snapshots, package=TIKTOK_PACKAGE)
     if not gate.passed:
+        # A readable but missing/non-unique selector is semantic evidence, not a
+        # transport failure. Never retry it as a transient runtime condition.
         raise RuntimeError(f"qualified For You feed anchor failed with counts={gate.counts}")
     return gate, batch
 
@@ -111,7 +143,6 @@ def _bootstrap_fyp(candidates: Path, candidate: int, device: str, preferred_port
 
     final_payload = None
     final_output = ""
-    final_returncode = 1
     retries = 0
 
     for attempt in range(1, 3):
@@ -131,9 +162,8 @@ def _bootstrap_fyp(candidates: Path, candidate: int, device: str, preferred_port
         payload = load_shareable(ROOT, output)
         final_payload = payload if isinstance(payload, dict) else None
         final_output = output
-        final_returncode = proc.returncode
 
-        if final_returncode == 0 and isinstance(final_payload, dict) and final_payload.get("status") == "PASS":
+        if proc.returncode == 0 and isinstance(final_payload, dict) and final_payload.get("status") == "PASS":
             (private / "bootstrap-fyp.log").write_text(output, encoding="utf-8", errors="replace")
             return retries
 
@@ -211,9 +241,21 @@ def main() -> int:
             print(f"Shareable result:           {shareable.relative_to(ROOT)}")
             return 0
 
+        # Session-level budgets prevent an unstable device/app from entering an
+        # unbounded recovery loop while still tolerating a small number of
+        # transient runtime faults.
+        recovery_budget = RecoveryBudget(
+            RecoveryLimits(
+                app_restarts=1,
+                hierarchy_retries=2,
+                adb_retries=1,
+                foreground_restores=2,
+                permission_recoveries=2,
+            )
+        )
         observer = AdbObserver(args.device)
         actions = AdbActions(args.device)
-        permission_recoveries = _ensure_ready(args.device, observer)
+        recovery_events = _ensure_ready(args.device, observer, recovery_budget)
         bootstrap_retries = _bootstrap_fyp(
             args.candidates,
             args.candidate,
@@ -227,8 +269,10 @@ def main() -> int:
         for index, watch_seconds in enumerate(plan.watch_seconds, start=1):
             if time.monotonic() - started >= plan.max_session_seconds:
                 raise RuntimeError("warm-scroll session deadline reached")
-            permission_recoveries += _ensure_ready(args.device, observer)
-            pre_gate, pre_batch = _feed_gate(args.device, candidate, args.preferred_hierarchy_port)
+            recovery_events += _ensure_ready(args.device, observer, recovery_budget)
+            pre_gate, pre_batch = _feed_gate(
+                args.device, candidate, args.preferred_hierarchy_port, recovery_budget
+            )
             providers.add(pre_batch.provider)
             print(f"[{index}/{plan.videos}] feed PASS; watching {watch_seconds:.2f}s")
 
@@ -236,23 +280,32 @@ def main() -> int:
             while remaining > 0:
                 if time.monotonic() - started >= plan.max_session_seconds:
                     raise RuntimeError("warm-scroll session deadline reached during watch")
-                permission_recoveries += _ensure_ready(args.device, observer)
+                recovery_events += _ensure_ready(args.device, observer, recovery_budget)
                 chunk = min(1.0, remaining)
                 time.sleep(chunk)
                 remaining -= chunk
 
-            frame = observer.capture_raw_frame()
+            try:
+                frame = observer.capture_raw_frame()
+            except AdbObservationError as exc:
+                decision = classify_error(exc)
+                if decision.action is RecoveryAction.RETRY_ADB and recovery_budget.consume(decision):
+                    time.sleep(0.75)
+                    frame = observer.capture_raw_frame()
+                else:
+                    raise
             actions.swipe_up_relative(width=frame.width, height=frame.height)
             time.sleep(1.0)
-            permission_recoveries += _ensure_ready(args.device, observer)
-            post_gate, post_batch = _feed_gate(args.device, candidate, args.preferred_hierarchy_port)
+            recovery_events += _ensure_ready(args.device, observer, recovery_budget)
+            post_gate, post_batch = _feed_gate(
+                args.device, candidate, args.preferred_hierarchy_port, recovery_budget
+            )
             providers.add(post_batch.provider)
             print(f"  PASS pre={pre_gate.counts} post={post_gate.counts}")
 
-        # The semantic postcondition above is the qualification gate.  A final
-        # screenshot is useful evidence but is not itself a correctness signal;
-        # do not convert a fully verified warm scroll into a false failure just
-        # because a trailing screencap command times out or briefly disconnects.
+        # The semantic postcondition above is the qualification gate. A final
+        # screenshot is evidence only; inability to take it does not erase the
+        # already-proven before/after selector evidence.
         screenshot_captured = False
         try:
             observer.capture_screenshot(private / "after.png")
@@ -264,7 +317,8 @@ def main() -> int:
             {
                 "status": "PASS",
                 "completed_videos": plan.videos,
-                "permission_recoveries": permission_recoveries,
+                "runtime_recovery_events": recovery_events,
+                "runtime_recovery_counts": recovery_budget.snapshot(),
                 "bootstrap_transient_retries": bootstrap_retries,
                 "hierarchy_providers": sorted(providers),
                 "action_backend": "adb_relative_swipe",
@@ -278,6 +332,7 @@ def main() -> int:
         print("Status:                     PASS")
         print(f"Completed videos:           {plan.videos}/{plan.videos}")
         print(f"Bootstrap retries:          {bootstrap_retries}")
+        print(f"Runtime recoveries:         {recovery_budget.snapshot() or 'NONE'}")
         print("Feed verification:          QUALIFIED ANCHOR BEFORE/AFTER EACH SWIPE")
         print(f"Final screenshot:           {'CAPTURED' if screenshot_captured else 'UNAVAILABLE / NON-BLOCKING'}")
         print("Engagement actions:         NONE")

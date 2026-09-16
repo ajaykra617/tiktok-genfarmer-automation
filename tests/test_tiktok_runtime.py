@@ -1,4 +1,4 @@
-from genfarmer_automation.adb_observer import DeviceObservation, InterruptKind
+from genfarmer_automation.adb_observer import DeviceObservation, InterruptKind, TIKTOK_PACKAGE
 from genfarmer_automation.tiktok_runtime import (
     ForegroundDecision,
     TIKTOK_COMPONENT,
@@ -32,9 +32,14 @@ class FakeObserver:
 class FakeActions:
     def __init__(self):
         self.components = []
+        self.stopped = []
 
     def launch_component(self, component):
         self.components.append(component)
+        return {"ok": True}
+
+    def stop_package(self, package):
+        self.stopped.append(package)
         return {"ok": True}
 
 
@@ -44,6 +49,11 @@ def test_plan_launcher_requires_launch():
 
 def test_plan_tiktok_is_ready():
     assert plan_foreground(obs(package="com.zhiliaoapp.musically")).decision is ForegroundDecision.READY
+
+
+def test_plan_anr_requires_bounded_restart():
+    value = obs(package="com.zhiliaoapp.musically", interrupt=InterruptKind.APP_NOT_RESPONDING)
+    assert plan_foreground(value).decision is ForegroundDecision.NEEDS_RESTART
 
 
 def test_plan_permission_dialog_fails_closed():
@@ -68,6 +78,43 @@ def test_ensure_foreground_launches_once_and_proves_state():
     assert result.success is True
     assert result.attempts == 1
     assert actions.components == [TIKTOK_COMPONENT]
+    assert actions.stopped == []
+
+
+def test_ensure_foreground_restarts_anr_once_and_proves_state():
+    hung = obs(package="com.zhiliaoapp.musically", interrupt=InterruptKind.APP_NOT_RESPONDING)
+    healthy = obs(package="com.zhiliaoapp.musically")
+    actions = FakeActions()
+    result = TikTokRuntime(
+        "device:5555",
+        observer=FakeObserver([hung, healthy]),
+        actions=actions,
+        settle_seconds=0,
+        poll_seconds=0,
+        max_polls=2,
+    ).ensure_foreground()
+    assert result.success is True
+    assert result.attempts == 1
+    assert actions.stopped == [TIKTOK_PACKAGE]
+    assert actions.components == [TIKTOK_COMPONENT]
+    assert "restart" in result.reason
+
+
+def test_ensure_foreground_does_not_loop_repeated_anr():
+    hung = obs(package="com.zhiliaoapp.musically", interrupt=InterruptKind.APP_NOT_RESPONDING)
+    actions = FakeActions()
+    result = TikTokRuntime(
+        "device:5555",
+        observer=FakeObserver([hung, hung]),
+        actions=actions,
+        settle_seconds=0,
+        poll_seconds=0,
+        max_polls=3,
+    ).ensure_foreground()
+    assert result.success is False
+    assert actions.stopped == [TIKTOK_PACKAGE]
+    assert actions.components == [TIKTOK_COMPONENT]
+    assert "remained app-not-responding" in result.reason
 
 
 def test_ensure_foreground_never_launches_through_interrupt():
@@ -86,3 +133,4 @@ def test_ensure_foreground_never_launches_through_interrupt():
     assert result.success is False
     assert result.attempts == 0
     assert actions.components == []
+    assert actions.stopped == []

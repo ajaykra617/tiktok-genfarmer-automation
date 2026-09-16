@@ -3,6 +3,11 @@
 This layer is intentionally conservative: it only proves/recovers foreground
 state for the already-qualified TikTok package/component. Selector-level feed
 readiness and popup handling remain separate later gates.
+
+An Android APP_NOT_RESPONDING state is treated differently from an arbitrary
+interrupt: the supervisor may perform one bounded process restart (force-stop,
+then relaunch the qualified component) and must prove healthy foreground state
+again. No app data is cleared and no UI coordinate is guessed.
 """
 
 from __future__ import annotations
@@ -22,6 +27,7 @@ TIKTOK_COMPONENT = f"{TIKTOK_PACKAGE}/{TIKTOK_LAUNCHER_ACTIVITY}"
 class ForegroundDecision(str, Enum):
     READY = "ready"
     NEEDS_LAUNCH = "needs_launch"
+    NEEDS_RESTART = "needs_restart"
     BLOCKED_INTERRUPT = "blocked_interrupt"
     DEVICE_UNAVAILABLE = "device_unavailable"
 
@@ -47,11 +53,17 @@ class ObserverLike(Protocol):
 
 class ActionsLike(Protocol):
     def launch_component(self, component: str): ...
+    def stop_package(self, package: str): ...
 
 
 def plan_foreground(observation: DeviceObservation) -> ForegroundPlan:
     if observation.adb_state != "device" or observation.interrupt is InterruptKind.DEVICE_OFFLINE:
         return ForegroundPlan(ForegroundDecision.DEVICE_UNAVAILABLE, "ADB device is not ready")
+    if observation.interrupt is InterruptKind.APP_NOT_RESPONDING:
+        return ForegroundPlan(
+            ForegroundDecision.NEEDS_RESTART,
+            "TikTok is in an app-not-responding state; bounded process restart is allowed",
+        )
     if observation.interrupt is not InterruptKind.NONE:
         return ForegroundPlan(
             ForegroundDecision.BLOCKED_INTERRUPT,
@@ -92,8 +104,16 @@ class TikTokRuntime:
         plan = plan_foreground(initial)
         if plan.decision is ForegroundDecision.READY:
             return EnsureForegroundResult(True, 0, initial, initial, plan.reason)
-        if plan.decision is not ForegroundDecision.NEEDS_LAUNCH:
+        if plan.decision not in {ForegroundDecision.NEEDS_LAUNCH, ForegroundDecision.NEEDS_RESTART}:
             return EnsureForegroundResult(False, 0, initial, initial, plan.reason)
+
+        restarted = plan.decision is ForegroundDecision.NEEDS_RESTART
+        if restarted:
+            self.actions.stop_package(TIKTOK_PACKAGE)
+            # A short settle keeps the restart bounded while allowing Android to
+            # tear down the wedged process before the qualified relaunch.
+            if self.settle_seconds:
+                time.sleep(min(self.settle_seconds, 1.0))
 
         self.actions.launch_component(TIKTOK_COMPONENT)
         attempts = 1
@@ -105,9 +125,27 @@ class TikTokRuntime:
             final = self.observer.observe()
             current = plan_foreground(final)
             if current.decision is ForegroundDecision.READY:
-                return EnsureForegroundResult(True, attempts, initial, final, "TikTok foreground proven after relaunch")
-            if current.decision in {ForegroundDecision.BLOCKED_INTERRUPT, ForegroundDecision.DEVICE_UNAVAILABLE}:
+                reason = (
+                    "TikTok foreground proven after bounded app restart"
+                    if restarted
+                    else "TikTok foreground proven after relaunch"
+                )
+                return EnsureForegroundResult(True, attempts, initial, final, reason)
+            if current.decision in {
+                ForegroundDecision.BLOCKED_INTERRUPT,
+                ForegroundDecision.DEVICE_UNAVAILABLE,
+            }:
                 return EnsureForegroundResult(False, attempts, initial, final, current.reason)
+            # A repeated ANR after the single restart is not restarted again in
+            # this call. This preserves the one-restart recovery budget.
+            if current.decision is ForegroundDecision.NEEDS_RESTART and restarted:
+                return EnsureForegroundResult(
+                    False,
+                    attempts,
+                    initial,
+                    final,
+                    "TikTok remained app-not-responding after the bounded restart",
+                )
             if index + 1 < self.max_polls and self.poll_seconds:
                 time.sleep(self.poll_seconds)
 

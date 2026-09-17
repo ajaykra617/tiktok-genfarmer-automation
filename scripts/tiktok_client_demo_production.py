@@ -14,6 +14,11 @@ GenFarmer's existing UiAutomator helper can report that its service started befo
 helper for a few bounded seconds before allowing the workflow to spend a TikTok
 app-restart budget.
 
+Feed swipes are additionally guarded by one deep ANR observation immediately before
+the mutation. A swipe is not sent when Android already reports APP_NOT_RESPONDING;
+if the input command itself times out, a second deep observation reclassifies a
+newly surfaced ANR without retrying the ambiguous mutation.
+
 The diagnostics are read-only and best-effort. They never block recovery and are
 kept under ``evidence/runtime-recovery-diagnostics`` rather than shareable output.
 """
@@ -30,11 +35,12 @@ if str(SRC) not in sys.path:
     sys.path.insert(0, str(SRC))
 
 # Importing the resilient wrapper installs its FYP proof/restoration hooks into
-# the base demo module. Keep this import before replacing the supervisor class.
+# the base demo module. Keep this import before replacing runtime globals.
 import tiktok_client_demo_resilient  # noqa: F401,E402
 import tiktok_client_demo as demo  # noqa: E402
 
 from genfarmer_automation import hierarchy_runtime  # noqa: E402
+from genfarmer_automation.anr_guarded_actions import AnrGuardedAdbActions  # noqa: E402
 from genfarmer_automation.hierarchy_settle import wrap_discover_helper_port  # noqa: E402
 from genfarmer_automation.runtime_diagnostics import capture_tiktok_runtime_diagnostics  # noqa: E402
 from genfarmer_automation.runtime_supervisor import TikTokRuntimeSupervisor  # noqa: E402
@@ -103,8 +109,9 @@ class DiagnosticTikTokRuntimeSupervisor(TikTokRuntimeSupervisor):
             )
 
 
-# The base demo resolves this global when main() constructs its supervisor.
+# The base demo resolves these globals when main() constructs its runtime objects.
 demo.TikTokRuntimeSupervisor = DiagnosticTikTokRuntimeSupervisor
+demo.AdbActions = AnrGuardedAdbActions
 
 
 if __name__ == "__main__":

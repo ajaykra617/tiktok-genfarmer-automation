@@ -34,6 +34,20 @@ class FakeObserver:
         return value
 
 
+class DeepFakeObserver(FakeObserver):
+    def __init__(self, values, deep_values):
+        super().__init__(values)
+        self.deep_values = list(deep_values)
+        self.deep_index = 0
+
+    def observe_deep(self):
+        value = self.deep_values[min(self.deep_index, len(self.deep_values) - 1)]
+        self.deep_index += 1
+        if isinstance(value, BaseException):
+            raise value
+        return value
+
+
 class FakeRuntime:
     def __init__(self, result):
         self.result = result
@@ -78,6 +92,43 @@ def test_stability_gate_requires_consecutive_healthy_observations():
     supervisor.ensure_stable(apply=False, consecutive=3, interval_seconds=0)
     assert observer.index >= 6
     assert supervisor.snapshot().recovery_budget_used == {}
+
+
+def test_stability_gate_prefers_deep_checkpoint_observations():
+    observer = DeepFakeObserver(
+        [obs(), obs(), obs(), obs(), obs()],
+        [obs(), obs(), obs()],
+    )
+    supervisor = TikTokRuntimeSupervisor(
+        "device:5555",
+        observer=observer,
+        sleeper=lambda _seconds: None,
+    )
+    supervisor.ensure_stable(apply=False, consecutive=3, interval_seconds=0)
+    assert observer.deep_index == 3
+
+
+def test_stability_gate_recovers_anr_found_only_by_deep_observation():
+    runtime = FakeRuntime(SimpleNamespace(success=True, reason="ok"))
+    observer = DeepFakeObserver(
+        [obs(), obs(), obs(), obs(), obs(), obs()],
+        [
+            obs(interrupt=InterruptKind.APP_NOT_RESPONDING),
+            obs(),
+            obs(),
+            obs(),
+        ],
+    )
+    supervisor = TikTokRuntimeSupervisor(
+        "device:5555",
+        observer=observer,
+        runtime_factory=runtime.factory,
+        sleeper=lambda _seconds: None,
+        budget=RecoveryBudget(RecoveryLimits(app_restarts=2)),
+    )
+    supervisor.ensure_stable(apply=True, consecutive=3, interval_seconds=0)
+    assert runtime.calls == 1
+    assert supervisor.snapshot().recovery_budget_used == {"restart_app": 1}
 
 
 def test_stability_gate_rejects_invalid_parameters():

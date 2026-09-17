@@ -85,6 +85,21 @@ class TikTokRuntimeSupervisor:
                 if self.retry_sleep_seconds:
                     self.sleeper(self.retry_sleep_seconds)
 
+    def _observe_checkpoint_with_retry(self):
+        """Use the strongest available read-only observation at checkpoints."""
+        while True:
+            try:
+                deep = getattr(self.observer, "observe_deep", None)
+                if callable(deep):
+                    return deep()
+                return self.observer.observe()
+            except Exception as exc:
+                decision = classify_error(exc)
+                if decision.action is not RecoveryAction.RETRY_ADB or not self.budget.consume(decision):
+                    raise RuntimeSupervisorError(str(exc) or "ADB checkpoint observation failed") from exc
+                if self.retry_sleep_seconds:
+                    self.sleeper(self.retry_sleep_seconds)
+
     def ensure_ready(self, *, apply: bool = True) -> None:
         """Prove one healthy TikTok foreground observation with bounded recovery."""
         for _ in range(4):
@@ -127,13 +142,13 @@ class TikTokRuntimeSupervisor:
         consecutive: int = 3,
         interval_seconds: float = 0.35,
     ) -> None:
-        """Require multiple consecutive healthy observations.
+        """Require multiple consecutive healthy checkpoint observations.
 
         A single foreground observation can be a brief transition before Android
         surfaces an ANR dialog or the activity disappears again. Demo/session
         entry and post-restart checkpoints therefore use this stronger gate.
-        Normal per-second watch loops can continue using ``ensure_ready`` to keep
-        their observation overhead small.
+        When the observer exposes ``observe_deep()``, this method also inspects
+        TikTok's ProcessRecord for framework ANR state.
         """
         if not 1 <= consecutive <= 8:
             raise ValueError("consecutive must be between 1 and 8")
@@ -146,11 +161,10 @@ class TikTokRuntimeSupervisor:
 
         while healthy < consecutive and attempts < max_attempts:
             attempts += 1
-            # This call may itself perform bounded ANR/foreground/permission
-            # recovery. Only observations after it returns count toward the
-            # consecutive-stability requirement.
+            # First allow the normal bounded recovery path to restore foreground
+            # state. Then require an independent deep checkpoint observation.
             self.ensure_ready(apply=apply)
-            observation = self._observe_with_retry()
+            observation = self._observe_checkpoint_with_retry()
             decision = classify_observation(observation)
             if decision.kind is RuntimeFailureKind.HEALTHY:
                 healthy += 1
@@ -161,9 +175,31 @@ class TikTokRuntimeSupervisor:
             healthy = 0
             if not apply:
                 raise RuntimeSupervisorError(decision.reason)
-            # Let ensure_ready handle this newly observed unhealthy state on the
-            # next iteration. This keeps all mutations inside the existing
-            # classified bounded-recovery path.
+
+            # If the deep observation found an ANR/foreground problem that the
+            # lightweight sample missed, perform its classified recovery now
+            # rather than waiting for a later stage to fail semantically.
+            if not self.budget.consume(decision):
+                raise RuntimeSupervisorError(
+                    f"runtime recovery budget exhausted or failure is not retryable: {decision.reason}"
+                )
+
+            if decision.action is RecoveryAction.RECOVER_PERMISSION:
+                recovered = self.permission_recoverer(self.device, observer=self.observer)
+                if not getattr(recovered, "success", False):
+                    reason = getattr(recovered, "reason", "permission recovery failed")
+                    raise RuntimeSupervisorError(f"permission recovery failed: {reason}")
+            elif decision.action in {RecoveryAction.RESTORE_FOREGROUND, RecoveryAction.RESTART_APP}:
+                kwargs = {"observer": self.observer}
+                if self.actions is not None:
+                    kwargs["actions"] = self.actions
+                recovered = self.runtime_factory(self.device, **kwargs).ensure_foreground()
+                if not getattr(recovered, "success", False):
+                    reason = getattr(recovered, "reason", "TikTok runtime recovery failed")
+                    raise RuntimeSupervisorError(f"TikTok runtime recovery failed: {reason}")
+            else:
+                raise RuntimeSupervisorError(decision.reason)
+
             if interval_seconds:
                 self.sleeper(interval_seconds)
 
@@ -216,7 +252,7 @@ class TikTokRuntimeSupervisor:
 
         # Do not trust one foreground sample after relaunch. The app can briefly
         # appear healthy and immediately surface another ANR. Three consecutive
-        # observations materially reduce that false-success window.
+        # deep observations materially reduce that false-success window.
         self.ensure_stable(apply=False, consecutive=3, interval_seconds=0.35)
 
     def run_read_only(self, operation: Callable[[], T]) -> T:

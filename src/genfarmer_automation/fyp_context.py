@@ -14,6 +14,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from enum import Enum
+import re
 
 from .native_ui import NativeUiError, collect_nodes
 from .warmup_features import (
@@ -39,6 +40,30 @@ class FypContextProof:
 
 def _norm(value: str) -> str:
     return " ".join((value or "").casefold().replace("_", " ").replace("-", " ").split())
+
+
+def _tokens(value: str) -> tuple[str, ...]:
+    """Return conservative word tokens for semantic phrase matching.
+
+    Plain substring matching is unsafe for short markers. For example ``ad`` is
+    contained in ``loading`` and previously caused a loading shell to be
+    misclassified as a sponsored card. Token/phrase matching avoids that entire
+    class of collision while still tolerating punctuation around UI labels.
+    """
+    return tuple(re.findall(r"[^\W_]+", _norm(value), flags=re.UNICODE))
+
+
+def _contains_phrase(value: str, phrase: str) -> bool:
+    haystack = _tokens(value)
+    needle = _tokens(phrase)
+    if not haystack or not needle or len(needle) > len(haystack):
+        return False
+    width = len(needle)
+    return any(haystack[index:index + width] == needle for index in range(len(haystack) - width + 1))
+
+
+def _contains_any_phrase(value: str, phrases: tuple[str, ...]) -> bool:
+    return any(_contains_phrase(value, phrase) for phrase in phrases)
 
 
 def classify_fyp_context(xml: str, *, package: str | None = None) -> FypContextProof:
@@ -72,9 +97,11 @@ def classify_fyp_context(xml: str, *, package: str | None = None) -> FypContextP
     else:
         content_signals.append("creator-profile")
 
-    # These terms are used only as conservative evidence that some legitimate
-    # feed card is rendered. They do not cause clicks or engagement.
-    phrase_groups = {
+    # These phrases are conservative evidence that a legitimate feed card is
+    # rendered. They never trigger engagement or direct taps. Avoid very broad
+    # single-token markers such as "ad", "photo", or "product": those words can
+    # occur inside unrelated/loading UI and are not sufficient proof by themselves.
+    phrase_groups: dict[str, tuple[str, ...]] = {
         "live-card": (
             "tap to watch live",
             "watch live",
@@ -88,18 +115,19 @@ def classify_fyp_context(xml: str, *, package: str | None = None) -> FypContextP
             "photo mode",
             "swipe left",
             "swipe to see more",
-            "photo",
-            "photos",
+            "view photos",
         ),
         "sponsored-card": (
             "sponsored",
-            "ad",
             "advertisement",
+            "paid partnership",
+            "promoted",
         ),
         "shop-card": (
             "shop now",
             "view product",
-            "product",
+            "product details",
+            "buy now",
         ),
     }
     loading_terms = (
@@ -115,14 +143,24 @@ def classify_fyp_context(xml: str, *, package: str | None = None) -> FypContextP
         text = _norm(f"{node.text} {node.content_desc}")
         if not text:
             continue
-        if any(term in text for term in loading_terms):
+        if _contains_any_phrase(text, loading_terms):
             loading_signal = True
-        for label, terms in phrase_groups.items():
-            if label not in seen and any(term in text for term in terms):
+        for label, phrases in phrase_groups.items():
+            if label not in seen and _contains_any_phrase(text, phrases):
                 seen.add(label)
                 content_signals.append(label)
 
     signals.extend(content_signals)
+
+    # Explicit loading evidence wins when the hierarchy has no independent
+    # standard feed affordance. This prevents stale/generic text from turning a
+    # launch shell into a false healthy-content proof.
+    strong_standard_content = any(
+        signal in content_signals for signal in ("comments-control", "creator-profile")
+    )
+    if loading_signal and not strong_standard_content:
+        return FypContextProof(False, tuple(signals + ["loading-indicator"]), FypState.LOADING)
+
     if content_signals:
         return FypContextProof(True, tuple(signals), FypState.CONTENT)
     if loading_signal:

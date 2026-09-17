@@ -9,7 +9,7 @@ Recovery remains intentionally bounded:
 - TikTok background/ANR: bounded foreground restore or process restart;
 - hierarchy and read-only ADB failures: bounded read-only retries;
 - explicit hard restart: force-stop only TikTok, relaunch the qualified
-  component, and prove healthy foreground state again;
+  component, and prove stable healthy foreground state again;
 - unknown semantic/UI failures: fail closed.
 
 A hard restart is intentionally not a generic retry mechanism. Callers may use
@@ -86,7 +86,7 @@ class TikTokRuntimeSupervisor:
                     self.sleeper(self.retry_sleep_seconds)
 
     def ensure_ready(self, *, apply: bool = True) -> None:
-        """Prove healthy TikTok foreground, applying only bounded known recovery."""
+        """Prove one healthy TikTok foreground observation with bounded recovery."""
         for _ in range(4):
             observation = self._observe_with_retry()
             decision = classify_observation(observation)
@@ -120,6 +120,58 @@ class TikTokRuntimeSupervisor:
 
         raise RuntimeSupervisorError("TikTok healthy runtime state was not proven within the recovery loop budget")
 
+    def ensure_stable(
+        self,
+        *,
+        apply: bool = True,
+        consecutive: int = 3,
+        interval_seconds: float = 0.35,
+    ) -> None:
+        """Require multiple consecutive healthy observations.
+
+        A single foreground observation can be a brief transition before Android
+        surfaces an ANR dialog or the activity disappears again. Demo/session
+        entry and post-restart checkpoints therefore use this stronger gate.
+        Normal per-second watch loops can continue using ``ensure_ready`` to keep
+        their observation overhead small.
+        """
+        if not 1 <= consecutive <= 8:
+            raise ValueError("consecutive must be between 1 and 8")
+        if not 0 <= interval_seconds <= 5:
+            raise ValueError("interval_seconds must be between 0 and 5")
+
+        healthy = 0
+        attempts = 0
+        max_attempts = max(consecutive * 4, consecutive + 3)
+
+        while healthy < consecutive and attempts < max_attempts:
+            attempts += 1
+            # This call may itself perform bounded ANR/foreground/permission
+            # recovery. Only observations after it returns count toward the
+            # consecutive-stability requirement.
+            self.ensure_ready(apply=apply)
+            observation = self._observe_with_retry()
+            decision = classify_observation(observation)
+            if decision.kind is RuntimeFailureKind.HEALTHY:
+                healthy += 1
+                if healthy < consecutive and interval_seconds:
+                    self.sleeper(interval_seconds)
+                continue
+
+            healthy = 0
+            if not apply:
+                raise RuntimeSupervisorError(decision.reason)
+            # Let ensure_ready handle this newly observed unhealthy state on the
+            # next iteration. This keeps all mutations inside the existing
+            # classified bounded-recovery path.
+            if interval_seconds:
+                self.sleeper(interval_seconds)
+
+        if healthy < consecutive:
+            raise RuntimeSupervisorError(
+                f"TikTok did not remain healthy for {consecutive} consecutive observations"
+            )
+
     def hard_restart(self, *, reason: str, settle_seconds: float = 1.5) -> None:
         """Perform one budgeted clean TikTok process restart from a checkpoint.
 
@@ -127,7 +179,8 @@ class TikTokRuntimeSupervisor:
         that app's private memory. We deliberately do not run global RAM cleaners,
         clear application data/cache, reinstall TikTok, or touch unrelated apps.
         After the stop, the already-qualified TikTok launcher component is
-        relaunched and healthy foreground state must be proven before returning.
+        relaunched and stable healthy foreground state must be proven before
+        returning.
         """
         if not isinstance(reason, str) or not reason.strip():
             raise ValueError("hard restart reason must be a non-empty string")
@@ -161,14 +214,10 @@ class TikTokRuntimeSupervisor:
             detail = getattr(recovered, "reason", "TikTok did not recover after hard restart")
             raise RuntimeSupervisorError(f"TikTok hard restart failed: {detail}")
 
-        # One final independent observation ensures the runtime did not briefly
-        # foreground and immediately disappear again.
-        final = self._observe_with_retry()
-        final_decision = classify_observation(final)
-        if final_decision.kind is not RuntimeFailureKind.HEALTHY:
-            raise RuntimeSupervisorError(
-                f"TikTok was not stable after hard restart: {final_decision.reason}"
-            )
+        # Do not trust one foreground sample after relaunch. The app can briefly
+        # appear healthy and immediately surface another ANR. Three consecutive
+        # observations materially reduce that false-success window.
+        self.ensure_stable(apply=False, consecutive=3, interval_seconds=0.35)
 
     def run_read_only(self, operation: Callable[[], T]) -> T:
         """Run one read-only operation with classified transient retries only.

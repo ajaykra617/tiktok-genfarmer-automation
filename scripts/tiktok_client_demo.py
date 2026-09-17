@@ -1,15 +1,17 @@
 #!/usr/bin/env python3
 """One-command TikTok Warm-up + Boost Preparation client demo.
 
-This is intentionally a presentation runner, not a hidden shortcut.  It uses
+This is intentionally a presentation runner, not a hidden shortcut. It uses
 qualified semantic gates and bounded runtime recovery, performs only passive
 Warm-up behavior, then runs the saved Boost Phase A standard preset through the
-READY_FOR_PUBLISH boundary.  It never likes, follows, replies, sends DMs, or
+READY_FOR_PUBLISH boundary. It never likes, follows, replies, sends DMs, or
 performs the final Post action.
 
-The demo avoids the unstable legacy `--feature for-you` extra tap.  If the
-qualified FYP is already proven, it remains in place; restoration taps For You
-only when the feed anchor is genuinely absent.
+TikTok can occasionally wedge, crash, or stop producing a healthy accessibility
+hierarchy even when the workflow itself is correct. Every replayable demo stage
+therefore starts from a known checkpoint and may perform one clean app-process
+restart before replaying that passive stage. The whole demo also has a global
+hard-restart budget. Unknown semantic failures still fail closed.
 """
 from __future__ import annotations
 
@@ -29,6 +31,10 @@ if str(SRC) not in sys.path:
 
 from genfarmer_automation.adb_actions import AdbActions  # noqa: E402
 from genfarmer_automation.adb_observer import AdbObserver  # noqa: E402
+from genfarmer_automation.app_resilience import (  # noqa: E402
+    StageRecoveryEvent,
+    run_checkpointed_stage,
+)
 from genfarmer_automation.client_demo_plan import build_client_demo_plan  # noqa: E402
 from genfarmer_automation.feed_anchor_qualification import candidates_from_payload  # noqa: E402
 from genfarmer_automation.hierarchy_runtime import capture_hierarchy_batch  # noqa: E402
@@ -76,8 +82,8 @@ def _prove_feed(supervisor, device: str, candidate, preferred_port: int):
     gate, batch = _gate(supervisor, device, candidate, preferred_port)
     if gate.passed:
         return gate, batch
-    # A readable hierarchy with a missing selector is semantic evidence.  One
-    # delayed read is allowed to absorb UI settle time; no mutation is replayed.
+    # A readable hierarchy with a missing selector may simply be a UI settle
+    # race. One delayed read is allowed; stage-level hard recovery is separate.
     time.sleep(0.8)
     gate, batch = _gate(supervisor, device, candidate, preferred_port)
     if not gate.passed:
@@ -89,14 +95,10 @@ def _restore_fyp(supervisor, actions: AdbActions, device: str, candidate, prefer
     """Restore and prove FYP without tapping it when already qualified."""
     for attempt in range(max_actions + 1):
         supervisor.ensure_ready(apply=True)
-        try:
-            gate, batch = _gate(supervisor, device, candidate, preferred_port)
-            if gate.passed:
-                return gate, batch, attempt
-            xml = batch.snapshots[-1]
-        except Exception:
-            # The supervisor has already exhausted classified read-only retries.
-            raise
+        gate, batch = _gate(supervisor, device, candidate, preferred_port)
+        if gate.passed:
+            return gate, batch, attempt
+        xml = batch.snapshots[-1]
 
         try:
             for_you = find_feed_source_node(xml, "for-you", package=TIKTOK_PACKAGE)
@@ -124,21 +126,44 @@ def _watch(supervisor, seconds: float) -> None:
         remaining -= chunk
 
 
-def _warm_scroll(*, supervisor, observer, actions, device, candidate, preferred_port, watch_seconds):
+def _warm_scroll(
+    *,
+    supervisor,
+    observer,
+    actions,
+    device,
+    candidate,
+    preferred_port,
+    watch_seconds,
+    restart_stage,
+    on_recovery,
+):
     rows = []
     for index, seconds in enumerate(watch_seconds, start=1):
-        pre_gate, _, restores = _restore_fyp(
-            supervisor, actions, device, candidate, preferred_port
+        label = f"warm-scroll-video-{index}"
+
+        def operation():
+            pre_gate, _, restores = _restore_fyp(
+                supervisor, actions, device, candidate, preferred_port
+            )
+            print(f"  [{index}/{len(watch_seconds)}] FYP PASS; watch {seconds:.2f}s")
+            _watch(supervisor, seconds)
+            frame = supervisor.run_read_only(observer.capture_raw_frame)
+            actions.swipe_up_relative(width=frame.width, height=frame.height)
+            time.sleep(1.0)
+            supervisor.ensure_ready(apply=True)
+            post_gate, _ = _prove_feed(supervisor, device, candidate, preferred_port)
+            print(f"      swipe PASS pre={pre_gate.counts} post={post_gate.counts}")
+            return {"video": index, "watch_seconds": seconds, "restores": restores}
+
+        row = run_checkpointed_stage(
+            label,
+            operation,
+            restart=restart_stage,
+            max_restarts=1,
+            on_recovery=on_recovery,
         )
-        print(f"  [{index}/{len(watch_seconds)}] FYP PASS; watch {seconds:.2f}s")
-        _watch(supervisor, seconds)
-        frame = supervisor.run_read_only(observer.capture_raw_frame)
-        actions.swipe_up_relative(width=frame.width, height=frame.height)
-        time.sleep(1.0)
-        supervisor.ensure_ready(apply=True)
-        post_gate, _ = _prove_feed(supervisor, device, candidate, preferred_port)
-        print(f"      swipe PASS pre={pre_gate.counts} post={post_gate.counts}")
-        rows.append({"video": index, "watch_seconds": seconds, "restores": restores})
+        rows.append(row)
     return rows
 
 
@@ -220,8 +245,6 @@ def _niche_feature(*, kind: str, value: str, device: str, preferred_port: int, p
         reason = payload.get("reason") if isinstance(payload, dict) else None
         raise RuntimeError(f"{kind} exploration failed: {reason or 'child did not reach PASS'}")
     _watch(supervisor, dwell)
-    # Search/results are an excursion.  BACK/For You restoration is bounded and
-    # every successful return is re-proven with the qualified FYP anchor.
     _restore_fyp(supervisor, actions, device, candidate, preferred_port)
     return {"status": "PASS", "context_verified": payload.get("context_verified")}
 
@@ -271,6 +294,7 @@ def main() -> int:
     ap.add_argument("--watch-max", type=float, default=7.0)
     ap.add_argument("--dwell", type=float, default=3.0)
     ap.add_argument("--seed", type=int, default=42)
+    ap.add_argument("--max-app-restarts", type=int, default=3)
     ap.add_argument("--preferred-hierarchy-port", type=int, default=8912)
     ap.add_argument("--apply", action="store_true")
     args = ap.parse_args()
@@ -287,6 +311,9 @@ def main() -> int:
         return 2
     if args.dwell < 0 or args.dwell > 30:
         print("ERROR: --dwell must be between 0 and 30 seconds", file=sys.stderr)
+        return 2
+    if not 0 <= args.max_app_restarts <= 5:
+        print("ERROR: --max-app-restarts must be between 0 and 5", file=sys.stderr)
         return 2
 
     stamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
@@ -308,6 +335,7 @@ def main() -> int:
         "final_post_action": False,
         "following_selected": False,
         "following_note": "not selected in this demo preset because the qualification account has no followed creators",
+        "max_app_restarts": args.max_app_restarts,
     }
 
     if not args.apply:
@@ -317,9 +345,12 @@ def main() -> int:
         print("Status:                     DRY_RUN_READY")
         print(f"Warm-up order:              {' -> '.join(plan.feature_order)}")
         print(f"Warm-scroll videos:         {len(plan.watch_seconds)}")
+        print(f"Hard app restart budget:    {args.max_app_restarts}")
         print("Boost preset:               phase_a_standard")
         print("Final Post action:          NONE")
         return 0
+
+    recovery_events: list[dict[str, object]] = []
 
     try:
         raw = json.loads(args.candidates.read_text(encoding="utf-8"))
@@ -334,10 +365,10 @@ def main() -> int:
         actions = AdbActions(args.device)
         budget = RecoveryBudget(
             RecoveryLimits(
-                app_restarts=1,
-                hierarchy_retries=4,
-                adb_retries=2,
-                foreground_restores=3,
+                app_restarts=args.max_app_restarts,
+                hierarchy_retries=6,
+                adb_retries=3,
+                foreground_restores=4,
                 permission_recoveries=2,
             )
         )
@@ -348,12 +379,35 @@ def main() -> int:
             budget=budget,
         )
 
+        def restart_stage(reason: str) -> None:
+            print("      RECOVERY: TikTok appears stalled; clean process restart")
+            supervisor.hard_restart(reason=reason, settle_seconds=2.0)
+            time.sleep(1.0)
+
+        def on_recovery(event: StageRecoveryEvent) -> None:
+            recovery_events.append(
+                {
+                    "stage": event.label,
+                    "restart_number": event.restart_number,
+                    "reason": event.reason,
+                }
+            )
+            print(f"      RECOVERY COMPLETE: replaying {event.label} from checkpoint")
+
         print("=" * 78)
         print("TIKTOK CLIENT DEMO - WARM-UP + BOOST PREPARATION")
         print("=" * 78)
         print("[1/3] Runtime + FYP preflight")
         supervisor.ensure_ready(apply=True)
-        gate, _, restores = _restore_fyp(supervisor, actions, args.device, candidate, args.preferred_hierarchy_port)
+        gate, _, restores = run_checkpointed_stage(
+            "runtime-fyp-preflight",
+            lambda: _restore_fyp(
+                supervisor, actions, args.device, candidate, args.preferred_hierarchy_port
+            ),
+            restart=restart_stage,
+            max_restarts=1,
+            on_recovery=on_recovery,
+        )
         print(f"      PASS FYP={gate.counts} restore_actions={restores}")
 
         print("[2/3] WARM-UP MODE")
@@ -365,32 +419,65 @@ def main() -> int:
             candidate=candidate,
             preferred_port=args.preferred_hierarchy_port,
             watch_seconds=plan.watch_seconds,
+            restart_stage=restart_stage,
+            on_recovery=on_recovery,
         )
         feature_results = {}
         for index, feature in enumerate(plan.feature_order, start=1):
             print(f"  feature {index}/{len(plan.feature_order)}: {feature}")
+
             if feature == "profile":
-                payload = _profile_feature(
-                    supervisor=supervisor, observer=observer, actions=actions, device=args.device,
-                    candidate=candidate, preferred_port=args.preferred_hierarchy_port, dwell=args.dwell,
+                operation = lambda: _profile_feature(
+                    supervisor=supervisor,
+                    observer=observer,
+                    actions=actions,
+                    device=args.device,
+                    candidate=candidate,
+                    preferred_port=args.preferred_hierarchy_port,
+                    dwell=args.dwell,
                 )
             elif feature == "comments":
-                payload = _comments_feature(
-                    supervisor=supervisor, observer=observer, actions=actions, device=args.device,
-                    candidate=candidate, preferred_port=args.preferred_hierarchy_port, dwell=args.dwell,
+                operation = lambda: _comments_feature(
+                    supervisor=supervisor,
+                    observer=observer,
+                    actions=actions,
+                    device=args.device,
+                    candidate=candidate,
+                    preferred_port=args.preferred_hierarchy_port,
+                    dwell=args.dwell,
                 )
             elif feature == "keyword":
-                payload = _niche_feature(
-                    kind="keyword", value=args.keyword, device=args.device,
-                    preferred_port=args.preferred_hierarchy_port, private=private,
-                    supervisor=supervisor, actions=actions, candidate=candidate, dwell=args.dwell,
+                operation = lambda: _niche_feature(
+                    kind="keyword",
+                    value=args.keyword,
+                    device=args.device,
+                    preferred_port=args.preferred_hierarchy_port,
+                    private=private,
+                    supervisor=supervisor,
+                    actions=actions,
+                    candidate=candidate,
+                    dwell=args.dwell,
                 )
             else:
-                payload = _niche_feature(
-                    kind="hashtag", value=args.hashtag, device=args.device,
-                    preferred_port=args.preferred_hierarchy_port, private=private,
-                    supervisor=supervisor, actions=actions, candidate=candidate, dwell=args.dwell,
+                operation = lambda: _niche_feature(
+                    kind="hashtag",
+                    value=args.hashtag,
+                    device=args.device,
+                    preferred_port=args.preferred_hierarchy_port,
+                    private=private,
+                    supervisor=supervisor,
+                    actions=actions,
+                    candidate=candidate,
+                    dwell=args.dwell,
                 )
+
+            payload = run_checkpointed_stage(
+                f"warmup-{feature}",
+                operation,
+                restart=restart_stage,
+                max_restarts=1,
+                on_recovery=on_recovery,
+            )
             feature_results[feature] = payload
             print("      PASS")
 
@@ -398,16 +485,23 @@ def main() -> int:
         result["warmup_scroll"] = warm_rows
         result["warmup_features"] = feature_results
         result["runtime_recovery_counts"] = supervisor.snapshot().recovery_budget_used
+        result["app_restart_events"] = recovery_events
         print("      WARM-UP STATUS: PASS")
 
         print("[3/3] BOOST MODE")
-        boost = _run_boost(
-            device=args.device,
-            proxy_id=args.proxy_id,
-            media=args.media,
-            seed=args.seed,
-            preferred_port=args.preferred_hierarchy_port,
-            private=private,
+        boost = run_checkpointed_stage(
+            "boost-preparation",
+            lambda: _run_boost(
+                device=args.device,
+                proxy_id=args.proxy_id,
+                media=args.media,
+                seed=args.seed,
+                preferred_port=args.preferred_hierarchy_port,
+                private=private,
+            ),
+            restart=restart_stage,
+            max_restarts=1,
+            on_recovery=on_recovery,
         )
         result.update(
             {
@@ -417,16 +511,20 @@ def main() -> int:
                 "boost_duplicate_guard_pass": boost.get("duplicate_guard_pass"),
                 "boost_media_reserved": boost.get("media_reserved"),
                 "boost_media_staged": boost.get("media_staged"),
+                "runtime_recovery_counts": supervisor.snapshot().recovery_budget_used,
+                "app_restart_events": recovery_events,
             }
         )
         _write_json(shareable, result)
 
+        restart_count = supervisor.snapshot().recovery_budget_used.get("restart_app", 0)
         print("-" * 78)
         print("CLIENT DEMO RESULT")
         print("Warm-up mode:               PASS")
         print(f"Warm-scroll videos:         {len(plan.watch_seconds)}/{len(plan.watch_seconds)}")
         print(f"Passive features:           {len(feature_results)}/{len(plan.feature_order)} PASS")
         print("Boost mode:                 READY_FOR_PUBLISH")
+        print(f"Hard app restarts:          {restart_count}/{args.max_app_restarts}")
         print("Engagement actions:         NONE")
         print("Publishing UI:              NOT ENTERED")
         print("Final Post action:          NONE")
@@ -438,6 +536,9 @@ def main() -> int:
     except (OSError, json.JSONDecodeError, RuntimeError, subprocess.TimeoutExpired, NativeUiError) as exc:
         result["status"] = "BLOCKED"
         result["reason"] = str(exc)
+        result["app_restart_events"] = recovery_events
+        if "supervisor" in locals():
+            result["runtime_recovery_counts"] = supervisor.snapshot().recovery_budget_used
         _write_json(shareable, result)
         print(f"ERROR: {exc}", file=sys.stderr)
         print(f"Shareable result: {shareable.relative_to(ROOT)}", file=sys.stderr)

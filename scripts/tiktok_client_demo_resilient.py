@@ -36,7 +36,12 @@ def _read_fyp_state(supervisor, device: str, candidate, preferred_port: int):
 
 
 def _settle_fyp_state(supervisor, device: str, candidate, preferred_port: int):
-    """Wait read-only for usable TikTok content, especially after a hard restart."""
+    """Wait read-only for usable TikTok content, especially after a hard restart.
+
+    Every FYP checkpoint begins with a deep stability gate. This matters because
+    Android can leave TikTok's activity visible underneath an ANR dialog; a
+    selector check alone would then misclassify the state as a feed problem.
+    """
     global _SETTLED_RESTART_COUNT
 
     current_restarts = _restart_count(supervisor)
@@ -45,10 +50,21 @@ def _settle_fyp_state(supervisor, device: str, candidate, preferred_port: int):
     interval = 1.0 if post_restart else 0.6
     last = None
 
+    # Checkpoint-level health is stronger than the per-second watch-loop health
+    # check: use ProcessRecord-aware deep observations before interpreting UI.
+    supervisor.ensure_stable(
+        apply=True,
+        consecutive=3 if post_restart else 2,
+        interval_seconds=0.25,
+    )
+
     if post_restart:
         print("      POST-RESTART SETTLE: waiting for stable TikTok content")
 
     for index in range(checks):
+        # The deep gate above protects the checkpoint. Subsequent settle reads can
+        # use the lightweight observation so a 15-second loading window remains
+        # reasonably cheap while still detecting visible window-level ANRs.
         supervisor.ensure_ready(apply=True)
         gate, batch, proof = _read_fyp_state(supervisor, device, candidate, preferred_port)
         last = (gate, batch, proof)

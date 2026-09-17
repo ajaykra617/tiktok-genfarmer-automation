@@ -42,6 +42,16 @@ _RESTART_WORTHY_MARKERS = (
     "boost explore did not reach pass",
 )
 
+# A timed-out read-only ADB command can be retried/recovered safely, but a timed-
+# out UI mutation may already have executed on the device. Replaying the whole
+# stage after an ambiguous mutation could double-apply a swipe/tap. These reasons
+# must therefore fail closed even if their text also looks like an ADB transient
+# or ANR that would otherwise be restart-worthy.
+_AMBIGUOUS_MUTATION_MARKERS = (
+    "adb action timed out",
+    "swipe outcome is ambiguous",
+)
+
 
 def restart_worthy_failure(error: BaseException | str) -> bool:
     """Return whether one checkpoint-level app restart is a reasonable recovery.
@@ -49,9 +59,14 @@ def restart_worthy_failure(error: BaseException | str) -> bool:
     Classified transport/runtime failures are eligible. A small explicit list of
     stage postcondition failures is also eligible because those stages are
     passive and the caller restarts back to a known checkpoint before replay.
-    Unknown semantic failures remain non-retryable.
+    Unknown semantic failures and ambiguous timed-out UI mutations remain
+    non-retryable.
     """
     text = str(error)
+    normalized = text.casefold()
+    if any(marker in normalized for marker in _AMBIGUOUS_MUTATION_MARKERS):
+        return False
+
     decision = classify_error(text)
     if decision.action in {
         RecoveryAction.RETRY_HIERARCHY,
@@ -60,7 +75,6 @@ def restart_worthy_failure(error: BaseException | str) -> bool:
         RecoveryAction.RESTORE_FOREGROUND,
     }:
         return True
-    normalized = text.casefold()
     return any(marker in normalized for marker in _RESTART_WORTHY_MARKERS)
 
 

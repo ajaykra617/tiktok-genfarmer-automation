@@ -318,11 +318,24 @@ def capture_hierarchy_batch(
     preferred_port: int | None = None,
     helper_timeout: float = 2.0,
     max_ports: int = 16,
+    uiautomator_timeout: float = 4.0,
 ) -> HierarchyBatch:
+    """Capture a stable hierarchy batch with bounded in-layer helper recovery.
+
+    A helper that passed discovery can still fail on a later sample while TikTok
+    is animating or after an app-process restart. Before dropping all the way to
+    standard ``uiautomator dump`` (which is slower and less reliable on animated
+    surfaces), retry the exact sample once, re-check the positively identified
+    helper service, and perform one fresh listener rediscovery. This recovery is
+    hierarchy-local: it does not restart TikTok and therefore does not consume an
+    application restart budget.
+    """
     if not 1 <= count <= 8:
         raise ValueError("count must be 1..8")
     if interval < 0:
         raise ValueError("interval must be >= 0")
+    if uiautomator_timeout <= 0:
+        raise ValueError("uiautomator_timeout must be > 0")
 
     attempts: list[str] = []
     port, discovery_attempts = discover_helper_port(
@@ -336,24 +349,129 @@ def capture_hierarchy_batch(
     if port is not None:
         snapshots: list[str] = []
         helper_ok = True
+        active_port = port
         for index in range(count):
-            try:
-                snapshots.append(_capture_helper_once(device, port, timeout=helper_timeout))
-            except HierarchyRuntimeError as exc:
-                attempts.append(f"helper:{port}:sample-{index + 1}:fail:{type(exc).__name__}")
+            sample_number = index + 1
+            sample: str | None = None
+            last_helper_error: HierarchyRuntimeError | None = None
+
+            # First attempt plus one short transient retry. A LIVE/photo/card
+            # transition can briefly make the accessibility helper unavailable
+            # even though the helper process itself remains healthy.
+            for retry in range(2):
+                try:
+                    sample = _capture_helper_once(
+                        device,
+                        active_port,
+                        timeout=helper_timeout,
+                    )
+                except HierarchyRuntimeError as exc:
+                    last_helper_error = exc
+                    suffix = "fail" if retry == 0 else "retry-fail"
+                    attempts.append(
+                        f"helper:{active_port}:sample-{sample_number}:{suffix}:{type(exc).__name__}"
+                    )
+                    if retry == 0:
+                        time.sleep(0.35)
+                else:
+                    if retry == 1:
+                        attempts.append(f"helper:{active_port}:sample-{sample_number}:retry-pass")
+                    break
+
+            # If the same helper still fails, positively identify/check its
+            # UiAutomator service and retry the sample before abandoning it.
+            if sample is None:
+                try:
+                    recovered = _recover_helper_service_once(
+                        device,
+                        active_port,
+                        timeout=min(max(helper_timeout, 0.5), 1.5),
+                    )
+                except HierarchyRuntimeError:
+                    recovered = False
+                attempts.append(
+                    f"helper:{active_port}:sample-{sample_number}:service-check:{'pass' if recovered else 'fail'}"
+                )
+                if recovered:
+                    time.sleep(0.6)
+                    try:
+                        sample = _capture_helper_once(
+                            device,
+                            active_port,
+                            timeout=max(helper_timeout, 1.5),
+                        )
+                    except HierarchyRuntimeError as exc:
+                        last_helper_error = exc
+                        attempts.append(
+                            f"helper:{active_port}:sample-{sample_number}:service-retry-fail:{type(exc).__name__}"
+                        )
+                    else:
+                        attempts.append(
+                            f"helper:{active_port}:sample-{sample_number}:service-retry-pass"
+                        )
+
+            # The app restart or GenFarmer helper lifecycle can move the healthy
+            # listener. Rediscover once and try the current sample on that port.
+            if sample is None:
+                rediscovered_port, rediscovery_attempts = discover_helper_port(
+                    device,
+                    preferred_port=active_port,
+                    probe_timeout=min(helper_timeout, 1.5),
+                    max_ports=max_ports,
+                )
+                attempts.extend(f"rediscovery:{entry}" for entry in rediscovery_attempts)
+                if rediscovered_port is not None:
+                    active_port = rediscovered_port
+                    try:
+                        sample = _capture_helper_once(
+                            device,
+                            active_port,
+                            timeout=helper_timeout,
+                        )
+                    except HierarchyRuntimeError as exc:
+                        last_helper_error = exc
+                        attempts.append(
+                            f"helper:{active_port}:sample-{sample_number}:rediscovery-fail:{type(exc).__name__}"
+                        )
+                    else:
+                        attempts.append(
+                            f"helper:{active_port}:sample-{sample_number}:rediscovery-pass"
+                        )
+
+            if sample is None:
                 helper_ok = False
+                if last_helper_error is not None:
+                    attempts.append(
+                        f"helper:{active_port}:sample-{sample_number}:exhausted:{type(last_helper_error).__name__}"
+                    )
                 break
+
+            snapshots.append(sample)
             if index + 1 < count and interval:
                 time.sleep(interval)
-        if helper_ok and len(snapshots) == count:
-            return HierarchyBatch(tuple(snapshots), "genfarmer-helper", port, tuple(attempts))
 
+        if helper_ok and len(snapshots) == count:
+            return HierarchyBatch(
+                tuple(snapshots),
+                "genfarmer-helper",
+                active_port,
+                tuple(attempts),
+            )
+
+    # Standard uiautomator is a last resort. Keep each command-level dump bounded
+    # so a poisoned accessibility service cannot make a production run appear to
+    # hang for minutes. Two retries are retained for transient framework races.
     snapshots = []
     for index in range(count):
         last_error: Exception | None = None
         for retry in range(2):
             try:
-                snapshots.append(capture_uiautomator_once(device))
+                snapshots.append(
+                    capture_uiautomator_once(
+                        device,
+                        timeout=uiautomator_timeout,
+                    )
+                )
                 attempts.append(f"uiautomator:sample-{index + 1}:pass")
                 last_error = None
                 break
@@ -363,7 +481,7 @@ def capture_hierarchy_batch(
                 if retry == 0:
                     time.sleep(0.35)
         if last_error is not None:
-            detail = "; ".join(attempts[-8:])
+            detail = "; ".join(attempts[-10:])
             raise HierarchyRuntimeError(
                 "no healthy hierarchy source after helper-service recovery and compressed/standard "
                 f"uiautomator fallback; recent attempts: {detail}"

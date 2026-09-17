@@ -8,6 +8,17 @@ This composes three layers without duplicating workflow logic:
    captures private Android evidence immediately before and after every hard
    TikTok process restart.
 
+Production also adds one hierarchy-only settle guard for a device-specific race:
+GenFarmer's existing UiAutomator helper can report that its service started before
+``/dump/hierarchy`` is actually ready. The guard polls that positively identified
+helper for a few bounded seconds before allowing the workflow to spend a TikTok
+app-restart budget.
+
+Feed swipes are additionally guarded by one deep ANR observation immediately before
+the mutation. A swipe is not sent when Android already reports APP_NOT_RESPONDING;
+if the input command itself times out, a second deep observation reclassifies a
+newly surfaced ANR without retrying the ambiguous mutation.
+
 The diagnostics are read-only and best-effort. They never block recovery and are
 kept under ``evidence/runtime-recovery-diagnostics`` rather than shareable output.
 """
@@ -24,12 +35,29 @@ if str(SRC) not in sys.path:
     sys.path.insert(0, str(SRC))
 
 # Importing the resilient wrapper installs its FYP proof/restoration hooks into
-# the base demo module. Keep this import before replacing the supervisor class.
+# the base demo module. Keep this import before replacing runtime globals.
 import tiktok_client_demo_resilient  # noqa: F401,E402
 import tiktok_client_demo as demo  # noqa: E402
 
+from genfarmer_automation import hierarchy_runtime  # noqa: E402
+from genfarmer_automation.anr_guarded_actions import AnrGuardedAdbActions  # noqa: E402
+from genfarmer_automation.hierarchy_settle import wrap_discover_helper_port  # noqa: E402
 from genfarmer_automation.runtime_diagnostics import capture_tiktok_runtime_diagnostics  # noqa: E402
 from genfarmer_automation.runtime_supervisor import TikTokRuntimeSupervisor  # noqa: E402
+
+
+# ``capture_hierarchy_batch`` was imported by the base demo as a function object,
+# but it resolves ``discover_helper_port`` through hierarchy_runtime's module
+# globals on each call. Replacing that one global therefore hardens every demo
+# hierarchy capture without duplicating the orchestration or changing semantics.
+if not getattr(hierarchy_runtime.discover_helper_port, "_gf_service_settle_wrapped", False):
+    _settled_discover = wrap_discover_helper_port(
+        hierarchy_runtime.discover_helper_port,
+        hierarchy_runtime._capture_helper_once,
+        hierarchy_runtime.HierarchyRuntimeError,
+    )
+    setattr(_settled_discover, "_gf_service_settle_wrapped", True)
+    hierarchy_runtime.discover_helper_port = _settled_discover
 
 
 class DiagnosticTikTokRuntimeSupervisor(TikTokRuntimeSupervisor):
@@ -81,8 +109,9 @@ class DiagnosticTikTokRuntimeSupervisor(TikTokRuntimeSupervisor):
             )
 
 
-# The base demo resolves this global when main() constructs its supervisor.
+# The base demo resolves these globals when main() constructs its runtime objects.
 demo.TikTokRuntimeSupervisor = DiagnosticTikTokRuntimeSupervisor
+demo.AdbActions = AnrGuardedAdbActions
 
 
 if __name__ == "__main__":

@@ -95,6 +95,33 @@ def test_explicit_loading_screen_is_loading():
     assert not proof.passed
     assert proof.state is FypState.LOADING
     assert "loading-indicator" in proof.signals
+    assert "sponsored-card" not in proof.signals
+
+
+def test_short_ad_marker_does_not_match_inside_loading_or_other_words():
+    for text in ("Loading...", "Heading", "Shadow", "Ready"):
+        proof = classify_fyp_context(xml(node(text="For You"), node(text=text)))
+        assert not proof.passed
+        assert proof.state is FypState.LOADING
+        assert "sponsored-card" not in proof.signals
+
+
+def test_explicit_sponsored_phrase_still_beats_bare_shell():
+    proof = classify_fyp_context(
+        xml(node(text="For You"), node(text="Paid partnership"))
+    )
+    assert proof.passed
+    assert proof.state is FypState.CONTENT
+    assert "sponsored-card" in proof.signals
+
+
+def test_loading_indicator_wins_over_weak_variant_text():
+    proof = classify_fyp_context(
+        xml(node(text="For You"), node(text="Loading..."), node(text="Sponsored"))
+    )
+    assert not proof.passed
+    assert proof.state is FypState.LOADING
+    assert "loading-indicator" in proof.signals
 
 
 def test_non_fyp_screen_is_off_fyp_even_with_live_text():

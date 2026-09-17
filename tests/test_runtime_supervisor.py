@@ -68,6 +68,30 @@ def test_healthy_runtime_needs_no_recovery():
     assert supervisor.snapshot().recovery_budget_used == {}
 
 
+def test_stability_gate_requires_consecutive_healthy_observations():
+    observer = FakeObserver([obs(), obs(), obs(), obs(), obs(), obs()])
+    supervisor = TikTokRuntimeSupervisor(
+        "device:5555",
+        observer=observer,
+        sleeper=lambda _seconds: None,
+    )
+    supervisor.ensure_stable(apply=False, consecutive=3, interval_seconds=0)
+    assert observer.index >= 6
+    assert supervisor.snapshot().recovery_budget_used == {}
+
+
+def test_stability_gate_rejects_invalid_parameters():
+    supervisor = TikTokRuntimeSupervisor(
+        "device:5555",
+        observer=FakeObserver([obs()]),
+        sleeper=lambda _seconds: None,
+    )
+    with pytest.raises(ValueError, match="consecutive"):
+        supervisor.ensure_stable(consecutive=0)
+    with pytest.raises(ValueError, match="interval_seconds"):
+        supervisor.ensure_stable(interval_seconds=6)
+
+
 def test_anr_consumes_one_restart_and_requires_proven_recovery():
     runtime = FakeRuntime(SimpleNamespace(success=True, reason="ok"))
     supervisor = TikTokRuntimeSupervisor(
@@ -159,7 +183,7 @@ def test_recovery_budget_exhaustion_fails_closed():
     assert runtime.calls == 0
 
 
-def test_hard_restart_force_stops_only_tiktok_and_reproves_health():
+def test_hard_restart_force_stops_only_tiktok_and_reproves_stability():
     runtime = FakeRuntime(SimpleNamespace(success=True, reason="ok"))
     actions = FakeActions()
     supervisor = TikTokRuntimeSupervisor(

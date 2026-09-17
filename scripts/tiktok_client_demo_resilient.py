@@ -96,6 +96,27 @@ def _settle_fyp_state(supervisor, device: str, candidate, preferred_port: int):
     return last
 
 
+def _is_live_survey(xml: str) -> bool:
+    """Recognize TikTok's passive LIVE-rating overlay without selecting an answer.
+
+    The overlay is a modal card shown on top of an otherwise valid For You LIVE
+    item. A generic feed swipe can be intercepted by the modal and leave the
+    workflow trapped on the same card. Recognition is intentionally strict so
+    ordinary LIVE cards keep using the normal bounded swipe path.
+    """
+    normalized = " ".join((xml or "").casefold().split())
+    return "is this live worth watching" in normalized and "submit" in normalized
+
+
+def _dismiss_live_survey(supervisor) -> None:
+    if supervisor.actions is None:
+        raise RuntimeError("LIVE survey recovery requires bounded Android actions")
+    print("      FYP VARIANT: live-survey; dismissing passive overlay with BACK")
+    supervisor.actions.keyevent(4)
+    time.sleep(0.8)
+    supervisor.ensure_ready(apply=True)
+
+
 def _advance_alternate_fyp(supervisor) -> None:
     if supervisor.actions is None:
         raise RuntimeError("FYP variant recovery requires bounded Android actions")
@@ -119,6 +140,9 @@ def resilient_prove_feed(supervisor, device: str, candidate, preferred_port: int
         if proof.state is FypState.CONTENT:
             if advance >= max_variant_advances:
                 raise RuntimeError("alternate FYP content persisted beyond bounded advance budget")
+            if _is_live_survey(batch.snapshots[-1]):
+                _dismiss_live_survey(supervisor)
+                continue
             print(
                 "      FYP VARIANT: "
                 + ",".join(proof.signals)
@@ -162,6 +186,9 @@ def resilient_restore_fyp(
         if proof.state is FypState.CONTENT:
             if attempt >= max_actions:
                 break
+            if _is_live_survey(xml):
+                _dismiss_live_survey(supervisor)
+                continue
             print(
                 "      FYP VARIANT: "
                 + ",".join(proof.signals)

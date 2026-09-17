@@ -50,6 +50,14 @@ class FakeRuntime:
         return Runtime()
 
 
+class FakeActions:
+    def __init__(self):
+        self.stopped = []
+
+    def stop_package(self, package):
+        self.stopped.append(package)
+
+
 def test_healthy_runtime_needs_no_recovery():
     supervisor = TikTokRuntimeSupervisor(
         "device:5555",
@@ -148,4 +156,42 @@ def test_recovery_budget_exhaustion_fails_closed():
     )
     with pytest.raises(RuntimeSupervisorError, match="budget exhausted"):
         supervisor.ensure_ready()
+    assert runtime.calls == 0
+
+
+def test_hard_restart_force_stops_only_tiktok_and_reproves_health():
+    runtime = FakeRuntime(SimpleNamespace(success=True, reason="ok"))
+    actions = FakeActions()
+    supervisor = TikTokRuntimeSupervisor(
+        "device:5555",
+        observer=FakeObserver([obs()]),
+        actions=actions,
+        runtime_factory=runtime.factory,
+        sleeper=lambda _seconds: None,
+        budget=RecoveryBudget(RecoveryLimits(app_restarts=2)),
+    )
+
+    supervisor.hard_restart(reason="checkpoint detected a stalled UI", settle_seconds=0)
+
+    assert actions.stopped == ["com.zhiliaoapp.musically"]
+    assert runtime.calls == 1
+    assert supervisor.snapshot().recovery_budget_used == {"restart_app": 1}
+
+
+def test_hard_restart_fails_closed_when_budget_is_exhausted():
+    runtime = FakeRuntime(SimpleNamespace(success=True, reason="ok"))
+    actions = FakeActions()
+    supervisor = TikTokRuntimeSupervisor(
+        "device:5555",
+        observer=FakeObserver([obs()]),
+        actions=actions,
+        runtime_factory=runtime.factory,
+        sleeper=lambda _seconds: None,
+        budget=RecoveryBudget(RecoveryLimits(app_restarts=0)),
+    )
+
+    with pytest.raises(RuntimeSupervisorError, match="hard-restart budget exhausted"):
+        supervisor.hard_restart(reason="stalled")
+
+    assert actions.stopped == []
     assert runtime.calls == 0

@@ -8,6 +8,12 @@ This composes three layers without duplicating workflow logic:
    captures private Android evidence immediately before and after every hard
    TikTok process restart.
 
+Production also adds one hierarchy-only settle guard for a device-specific race:
+GenFarmer's existing UiAutomator helper can report that its service started before
+``/dump/hierarchy`` is actually ready. The guard polls that positively identified
+helper for a few bounded seconds before allowing the workflow to spend a TikTok
+app-restart budget.
+
 The diagnostics are read-only and best-effort. They never block recovery and are
 kept under ``evidence/runtime-recovery-diagnostics`` rather than shareable output.
 """
@@ -28,8 +34,24 @@ if str(SRC) not in sys.path:
 import tiktok_client_demo_resilient  # noqa: F401,E402
 import tiktok_client_demo as demo  # noqa: E402
 
+from genfarmer_automation import hierarchy_runtime  # noqa: E402
+from genfarmer_automation.hierarchy_settle import wrap_discover_helper_port  # noqa: E402
 from genfarmer_automation.runtime_diagnostics import capture_tiktok_runtime_diagnostics  # noqa: E402
 from genfarmer_automation.runtime_supervisor import TikTokRuntimeSupervisor  # noqa: E402
+
+
+# ``capture_hierarchy_batch`` was imported by the base demo as a function object,
+# but it resolves ``discover_helper_port`` through hierarchy_runtime's module
+# globals on each call. Replacing that one global therefore hardens every demo
+# hierarchy capture without duplicating the orchestration or changing semantics.
+if not getattr(hierarchy_runtime.discover_helper_port, "_gf_service_settle_wrapped", False):
+    _settled_discover = wrap_discover_helper_port(
+        hierarchy_runtime.discover_helper_port,
+        hierarchy_runtime._capture_helper_once,
+        hierarchy_runtime.HierarchyRuntimeError,
+    )
+    setattr(_settled_discover, "_gf_service_settle_wrapped", True)
+    hierarchy_runtime.discover_helper_port = _settled_discover
 
 
 class DiagnosticTikTokRuntimeSupervisor(TikTokRuntimeSupervisor):

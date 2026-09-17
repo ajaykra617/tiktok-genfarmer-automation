@@ -4,6 +4,14 @@ This module intentionally avoids UI mutation. It uses ADB process/window state
 and optional screenshots to classify coarse device/app state before a GenFarmer
 module runs. Selector-level TikTok state checks belong in a higher layer once
 verified selectors are available.
+
+Two observation levels are exposed:
+- ``observe`` is the normal lightweight window/activity check used frequently;
+- ``observe_deep`` additionally inspects TikTok's ProcessRecord for ANR state.
+
+The deep check is reserved for stability gates and post-restart checkpoints so
+we can catch framework-level ANRs without making every watch-loop observation
+needlessly expensive.
 """
 
 from __future__ import annotations
@@ -69,6 +77,17 @@ _ANR_PATTERNS: tuple[re.Pattern[str], ...] = (
     re.compile(r"Application\s+Not\s+Responding", re.IGNORECASE),
     re.compile(r"APP_NOT_RESPONDING", re.IGNORECASE),
     re.compile(r"\bANR\b.*?" + re.escape(TIKTOK_PACKAGE), re.IGNORECASE),
+    # ProcessRecord formatting varies between Android releases. Restrict these
+    # markers to a bounded region after the TikTok package so another process's
+    # notResponding flag cannot create a false TikTok ANR.
+    re.compile(
+        re.escape(TIKTOK_PACKAGE) + r"[\s\S]{0,2000}\bnotResponding\s*[=:]\s*true\b",
+        re.IGNORECASE,
+    ),
+    re.compile(
+        re.escape(TIKTOK_PACKAGE) + r"[\s\S]{0,2000}\bnot\s+responding\s*[=:]\s*true\b",
+        re.IGNORECASE,
+    ),
 )
 
 
@@ -105,11 +124,11 @@ def parse_foreground(*texts: str) -> tuple[str | None, str | None]:
 
 
 def has_app_not_responding(*texts: str) -> bool:
-    """Detect Android's ANR surface from locale-independent dumpsys markers.
+    """Detect Android's ANR surface from locale-independent framework markers.
 
-    The visible dialog text itself is localized, so we deliberately key off
-    framework/window implementation markers rather than phrases such as
-    "TikTok isn't responding".
+    The visible dialog text itself is localized, so we prefer framework/window
+    implementation markers and ProcessRecord flags over phrases such as
+    ``TikTok isn't responding``.
     """
     joined = "\n".join(text for text in texts if text)
     return any(pattern.search(joined) for pattern in _ANR_PATTERNS)
@@ -140,7 +159,7 @@ class AdbObserver:
         self.device = device
         self.timeout = timeout
 
-    def observe(self) -> DeviceObservation:
+    def _observe(self, *, deep: bool) -> DeviceObservation:
         state = _adb(self.device, ["get-state"], timeout=self.timeout)
         if state != "device":
             return DeviceObservation(
@@ -151,10 +170,26 @@ class AdbObserver:
                 tiktok_foreground=False,
                 interrupt=InterruptKind.DEVICE_OFFLINE,
             )
+
         window = _adb(self.device, ["shell", "dumpsys", "window", "windows"], timeout=self.timeout)
         activity = _adb(self.device, ["shell", "dumpsys", "activity", "activities"], timeout=self.timeout)
         package, component = parse_foreground(window, activity)
-        interrupt = classify_interrupt(state, package, window, activity)
+
+        evidence = [window, activity]
+        if deep:
+            # Android's visible ANR dialog can occasionally appear after a brief
+            # foreground sample. ProcessRecord is the stronger secondary source.
+            # The package argument is a best-effort filter on modern Android;
+            # older builds may still return a broader process dump, which is safe
+            # because has_app_not_responding() scopes process flags to TikTok.
+            processes = _adb(
+                self.device,
+                ["shell", "dumpsys", "activity", "processes", TIKTOK_PACKAGE],
+                timeout=self.timeout,
+            )
+            evidence.append(processes)
+
+        interrupt = classify_interrupt(state, package, *evidence)
         return DeviceObservation(
             device=self.device,
             adb_state=state,
@@ -163,6 +198,14 @@ class AdbObserver:
             tiktok_foreground=package == TIKTOK_PACKAGE,
             interrupt=interrupt,
         )
+
+    def observe(self) -> DeviceObservation:
+        """Fast coarse observation for frequent runtime checks."""
+        return self._observe(deep=False)
+
+    def observe_deep(self) -> DeviceObservation:
+        """Checkpoint observation including TikTok ProcessRecord ANR evidence."""
+        return self._observe(deep=True)
 
     def capture_screenshot(self, path: str | Path) -> Path:
         output = Path(path)

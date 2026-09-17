@@ -55,6 +55,34 @@ def test_anr_detection_does_not_depend_on_localized_visible_text():
     )
 
 
+def test_process_record_not_responding_flag_is_detected():
+    processes = """
+    *APP* UID 10662 ProcessRecord{3da4d0d 26936:com.zhiliaoapp.musically/u0a662}
+      packageList={com.zhiliaoapp.musically}
+      notResponding=true
+      adj=0
+    """
+    assert has_app_not_responding(processes) is True
+    assert (
+        classify_interrupt("device", "com.zhiliaoapp.musically", processes)
+        is InterruptKind.APP_NOT_RESPONDING
+    )
+
+
+def test_other_process_not_responding_flag_does_not_poison_tiktok():
+    processes = """
+    ProcessRecord{111 222:com.example.other/u0a1}
+      notResponding=true
+    ProcessRecord{333 444:com.zhiliaoapp.musically/u0a662}
+      notResponding=false
+    """
+    assert has_app_not_responding(processes) is False
+    assert (
+        classify_interrupt("device", "com.zhiliaoapp.musically", processes)
+        is InterruptKind.NONE
+    )
+
+
 def test_normal_tiktok_foreground_is_not_anr():
     text = (
         "mCurrentFocus=Window{123 u0 "

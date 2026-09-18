@@ -8,7 +8,7 @@ from __future__ import annotations
 
 
 FOR_YOU = ("For You", "For you", "Pour toi")
-FOLLOWING = ("Following", "Abonnements")
+FOLLOWING = ("Following", "Abonnements", "Suivis")
 SEARCH = ("Search", "Rechercher")
 
 COMMENTS = ("Comments", "Comment", "Commentaires", "Commentaire")

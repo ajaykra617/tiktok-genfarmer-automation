@@ -61,7 +61,11 @@ def _worker_command(args, serial: str) -> list[str]:
         "--max-app-restarts", str(args.max_app_restarts),
         "--max-cycles", str(args.max_cycles),
         "--preferred-hierarchy-port", str(args.preferred_hierarchy_port),
-    ]
+    ] + (
+        ["--ai-advisor", "--ai-timeout", str(args.ai_timeout)]
+        if getattr(args, "ai_advisor", False)
+        else []
+    )
 
 
 def main() -> int:
@@ -81,6 +85,12 @@ def main() -> int:
     ap.add_argument("--max-app-restarts", type=int, default=3)
     ap.add_argument("--max-cycles", type=int, default=2)
     ap.add_argument("--preferred-hierarchy-port", type=int, default=8912)
+    ap.add_argument(
+        "--ai-advisor",
+        action="store_true",
+        help="enable constrained ModCon recovery advice in each device worker",
+    )
+    ap.add_argument("--ai-timeout", type=float, default=20.0)
     args = ap.parse_args()
 
     names = [name for name, _serial in args.device]

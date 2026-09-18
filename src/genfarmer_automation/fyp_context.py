@@ -22,6 +22,7 @@ from .warmup_features import (
     find_creator_profile_entry,
     find_feed_source_node,
 )
+from . import tiktok_semantics as semantics
 
 
 class FypState(str, Enum):
@@ -101,42 +102,8 @@ def classify_fyp_context(xml: str, *, package: str | None = None) -> FypContextP
     # rendered. They never trigger engagement or direct taps. Avoid very broad
     # single-token markers such as "ad", "photo", or "product": those words can
     # occur inside unrelated/loading UI and are not sufficient proof by themselves.
-    phrase_groups: dict[str, tuple[str, ...]] = {
-        "live-card": (
-            "tap to watch live",
-            "watch live",
-            "live now",
-        ),
-        "repost-affordance": (
-            "repost to followers",
-            "reposted",
-        ),
-        "photo-card": (
-            "photo mode",
-            "swipe left",
-            "swipe to see more",
-            "view photos",
-        ),
-        "sponsored-card": (
-            "sponsored",
-            "advertisement",
-            "paid partnership",
-            "promoted",
-        ),
-        "shop-card": (
-            "shop now",
-            "view product",
-            "product details",
-            "buy now",
-        ),
-    }
-    loading_terms = (
-        "loading",
-        "please wait",
-        "retry",
-        "no internet connection",
-        "network error",
-    )
+    phrase_groups: dict[str, tuple[str, ...]] = semantics.FYP_VARIANT_PHRASES
+    loading_terms = semantics.LOADING_TERMS
 
     seen: set[str] = set()
     for node in collect_nodes(xml, package=package):

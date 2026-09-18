@@ -438,7 +438,9 @@ def main() -> int:
             recovery_events.append(
                 {
                     "stage": label,
-                    "restart_number": 1,
+                    "restart_number": supervisor.snapshot().recovery_budget_used.get(
+                        "restart_app", 0
+                    ),
                     "reason": reason,
                     "replayed_stage": False,
                     "recovery_mode": "checkpoint_reset_without_mutation_replay",

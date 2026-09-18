@@ -29,27 +29,23 @@ _SAFE_TEXT_RE = re.compile(r"^[A-Za-z0-9 _.,!?@:+\-]*$")
 
 
 class AdbActions:
-    def __init__(self, device: str, *, timeout: float = 12.0) -> None:
+    def __init__(
+        self,
+        device: str,
+        *,
+        timeout: float = 12.0,
+        transport: AdbTransport | None = None,
+    ) -> None:
         self.device = device
         self.timeout = timeout
+        self.transport = transport or AdbTransport(device, timeout=timeout)
 
     def _run(self, args: Iterable[str]) -> str:
         try:
-            proc = subprocess.run(
-                ["adb", "-s", self.device, *args],
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE,
-                timeout=self.timeout,
-                check=False,
-            )
-        except FileNotFoundError as exc:
-            raise AdbActionError("adb was not found in PATH") from exc
-        except subprocess.TimeoutExpired as exc:
-            raise AdbActionError(f"adb action timed out after {self.timeout}s") from exc
-        if proc.returncode != 0:
-            err = proc.stderr.decode(errors="replace").strip()
-            raise AdbActionError(err or f"adb exited {proc.returncode}")
-        return proc.stdout.decode(errors="replace").strip()
+            result = self.transport.run(args, timeout=self.timeout, mutation=True)
+        except AdbTransportError as exc:
+            raise AdbActionError(str(exc)) from exc
+        return result.stdout_text()
 
     def launch_component(self, component: str) -> AdbActionResult:
         """Launch one explicitly qualified Android component."""

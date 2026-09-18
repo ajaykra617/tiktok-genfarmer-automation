@@ -19,6 +19,35 @@ from pathlib import Path
 from typing import Any, Callable, Mapping
 
 
+def load_project_env(
+    path: str | Path | None = None,
+    *,
+    override: bool = False,
+) -> Path | None:
+    """Load the repository-local .env without exposing or printing secrets.
+
+    Explicit process environment values win by default. The default path resolves
+    to <repo>/.env for the normal editable/source checkout used by this project.
+    """
+    env_path = (
+        Path(path).expanduser().resolve()
+        if path is not None
+        else Path(__file__).resolve().parents[2] / ".env"
+    )
+    if not env_path.is_file():
+        return None
+
+    try:
+        from dotenv import load_dotenv
+    except ImportError as exc:
+        raise AdvisorConfigurationError(
+            "python-dotenv is required to load the project .env; install the project ai extra"
+        ) from exc
+
+    load_dotenv(dotenv_path=env_path, override=override)
+    return env_path
+
+
 class FailureDomain(str, Enum):
     ADB_TRANSPORT = "adb_transport"
     ANDROID_RUNTIME = "android_runtime"
@@ -394,6 +423,7 @@ class ModConRecoveryAdvisor:
         timeout_seconds: float = 20.0,
         client: Any | None = None,
     ) -> None:
+        load_project_env()
         self.api_key = api_key or os.getenv("MODCON_API_KEY")
         self.base_url = base_url or os.getenv("MODCON_BASE_URL", "https://modcon.top/v1")
         self.model = model or os.getenv("MODCON_MODEL", "gpt-5.6-sol")

@@ -32,7 +32,7 @@ from genfarmer_automation.device_self_healing import (  # noqa: E402
     retryable_client_failure,
 )
 from genfarmer_automation.warmup_session import load_shareable  # noqa: E402
-from genfarmer_automation.interaction_trace import trace_event, trace_exception  # noqa: E402
+from genfarmer_automation.interaction_trace import console_safe_text, trace_event, trace_exception  # noqa: E402
 
 
 def _write_json(path: Path, value) -> None:
@@ -66,6 +66,8 @@ def _run_child_streamed(
         stderr=subprocess.STDOUT,
         bufsize=1,
         env=env,
+        encoding="utf-8",
+        errors="backslashreplace",
     )
     lines: queue.Queue[str | None] = queue.Queue()
 
@@ -109,7 +111,7 @@ def _run_child_streamed(
                     except Exception:
                         pass
                 timeout_line = "ERROR: client demo subprocess exceeded worker deadline\n"
-                print(timeout_line, end="", flush=True)
+                print(console_safe_text(timeout_line), end="", flush=True)
                 handle.write(timeout_line)
                 handle.flush()
                 parts.append(timeout_line)
@@ -126,7 +128,7 @@ def _run_child_streamed(
                 reached_eof = True
                 continue
 
-            print(item, end="", flush=True)
+            print(console_safe_text(item), end="", flush=True)
             handle.write(item)
             handle.flush()
             parts.append(item)
@@ -227,6 +229,7 @@ def main() -> int:
             os.environ["GF_INTERACTION_TRACE_CONSOLE"] = "1"
             os.environ["GF_INTERACTION_TRACE_DEVICE"] = args.device
             child_env = os.environ.copy()
+            child_env["PYTHONIOENCODING"] = "utf-8:backslashreplace"
 
             trace_event(
                 "cycle.begin",

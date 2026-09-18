@@ -91,25 +91,22 @@ _ANR_PATTERNS: tuple[re.Pattern[str], ...] = (
 )
 
 
-def _adb(device: str, args: Iterable[str], *, timeout: float = 12.0, binary: bool = False):
+def _adb(
+    device: str,
+    args: Iterable[str],
+    *,
+    timeout: float = 12.0,
+    binary: bool = False,
+    transport: AdbTransport | None = None,
+):
+    channel = transport or AdbTransport(device, timeout=timeout)
     try:
-        proc = subprocess.run(
-            ["adb", "-s", device, *args],
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            timeout=timeout,
-            check=False,
-        )
-    except FileNotFoundError as exc:
-        raise AdbObservationError("adb was not found in PATH") from exc
-    except subprocess.TimeoutExpired as exc:
-        raise AdbObservationError(f"adb command timed out after {timeout}s") from exc
-    if proc.returncode != 0:
-        err = proc.stderr.decode(errors="replace").strip()
-        raise AdbObservationError(err or f"adb exited {proc.returncode}")
+        result = channel.run(args, timeout=timeout, mutation=False)
+    except AdbTransportError as exc:
+        raise AdbObservationError(str(exc)) from exc
     if binary:
-        return proc.stdout
-    return proc.stdout.decode(errors="replace").strip()
+        return result.stdout
+    return result.stdout_text()
 
 
 def parse_foreground(*texts: str) -> tuple[str | None, str | None]:
@@ -155,12 +152,19 @@ def classify_interrupt(
 
 
 class AdbObserver:
-    def __init__(self, device: str, *, timeout: float = 12.0) -> None:
+    def __init__(
+        self,
+        device: str,
+        *,
+        timeout: float = 12.0,
+        transport: AdbTransport | None = None,
+    ) -> None:
         self.device = device
         self.timeout = timeout
+        self.transport = transport or AdbTransport(device, timeout=timeout)
 
     def _observe(self, *, deep: bool) -> DeviceObservation:
-        state = _adb(self.device, ["get-state"], timeout=self.timeout)
+        state = _adb(self.device, ["get-state"], timeout=self.timeout, transport=self.transport)
         if state != "device":
             return DeviceObservation(
                 device=self.device,
@@ -171,8 +175,8 @@ class AdbObserver:
                 interrupt=InterruptKind.DEVICE_OFFLINE,
             )
 
-        window = _adb(self.device, ["shell", "dumpsys", "window", "windows"], timeout=self.timeout)
-        activity = _adb(self.device, ["shell", "dumpsys", "activity", "activities"], timeout=self.timeout)
+        window = _adb(self.device, ["shell", "dumpsys", "window", "windows"], timeout=self.timeout, transport=self.transport)
+        activity = _adb(self.device, ["shell", "dumpsys", "activity", "activities"], timeout=self.timeout, transport=self.transport)
         package, component = parse_foreground(window, activity)
 
         evidence = [window, activity]
@@ -211,11 +215,11 @@ class AdbObserver:
         output = Path(path)
         output.parent.mkdir(parents=True, exist_ok=True)
         output.write_bytes(
-            _adb(self.device, ["exec-out", "screencap", "-p"], timeout=self.timeout, binary=True)
+            _adb(self.device, ["exec-out", "screencap", "-p"], timeout=self.timeout, binary=True, transport=self.transport)
         )
         return output
 
     def capture_raw_frame(self) -> RawScreenFrame:
         """Capture one raw RGBA frame without mutating the device."""
-        raw = _adb(self.device, ["exec-out", "screencap"], timeout=self.timeout, binary=True)
+        raw = _adb(self.device, ["exec-out", "screencap"], timeout=self.timeout, binary=True, transport=self.transport)
         return parse_android_raw_screencap(raw)

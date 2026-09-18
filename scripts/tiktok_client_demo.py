@@ -199,7 +199,11 @@ def _warm_scroll(
             label,
             operation,
             restart=restart_stage,
-            max_restarts=1,
+            # Warm-scroll is passive and returns to a qualified FYP
+            # checkpoint after every hard restart. Allow one second stage-local
+            # restart for genuinely unstable physical devices while the shared
+            # global app-restart budget still caps the complete client run.
+            max_restarts=2,
             on_recovery=on_recovery,
         )
         rows.append(row)

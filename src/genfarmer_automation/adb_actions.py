@@ -13,6 +13,7 @@ import re
 from typing import Iterable
 
 from .adb_transport import AdbTransport, AdbTransportError
+from .interaction_trace import trace_event, trace_exception
 
 
 class AdbActionError(RuntimeError):
@@ -55,21 +56,55 @@ class AdbActions:
         self.transport = transport or AdbTransport(device, timeout=timeout)
 
     def _run(self, args: Iterable[str]) -> str:
+        command_args = tuple(str(item) for item in args)
+        trace_event(
+            "mutation.begin",
+            device=self.device,
+            category="action",
+            args=command_args,
+            timeout_seconds=self.timeout,
+        )
         try:
-            result = self.transport.run(args, timeout=self.timeout, mutation=True)
+            result = self.transport.run(command_args, timeout=self.timeout, mutation=True)
         except AdbTransportError as exc:
+            trace_exception(
+                "mutation.error",
+                exc,
+                device=self.device,
+                category="action",
+                args=command_args,
+                mutation_ambiguous=exc.mutation_ambiguous,
+                transport_healthy=exc.transport_healthy,
+                failure_kind=exc.kind.value,
+            )
             raise AdbActionError(
                 str(exc),
                 mutation_ambiguous=exc.mutation_ambiguous,
                 transport_healthy=exc.transport_healthy,
                 failure_kind=exc.kind.value,
             ) from exc
+        trace_event(
+            "mutation.end",
+            device=self.device,
+            category="action",
+            args=command_args,
+            elapsed_seconds=round(result.elapsed_seconds, 6),
+            attempts=result.attempts,
+            recovered=result.recovered,
+            stdout=result.stdout_text(),
+        )
         return result.stdout_text()
 
     def launch_component(self, component: str) -> AdbActionResult:
         """Launch one explicitly qualified Android component."""
         if "/" not in component or any(ch.isspace() for ch in component):
             raise ValueError("component must be PACKAGE/ACTIVITY without whitespace")
+        trace_event(
+            "intent.launch_component",
+            device=self.device,
+            category="action",
+            component=component,
+        )
         out = self._run(["shell", "am", "start", "-W", "-n", component])
         return AdbActionResult(command="launch_component", stdout=out)
 
@@ -79,12 +114,25 @@ class AdbActions:
             raise ValueError("x must be a non-negative integer")
         if not isinstance(y, int) or isinstance(y, bool) or y < 0:
             raise ValueError("y must be a non-negative integer")
+        trace_event(
+            "intent.tap",
+            device=self.device,
+            category="action",
+            x=x,
+            y=y,
+        )
         out = self._run(["shell", "input", "tap", str(x), str(y)])
         return AdbActionResult(command="tap", stdout=out)
 
     def keyevent(self, keycode: int) -> AdbActionResult:
         if not isinstance(keycode, int) or isinstance(keycode, bool) or not 0 <= keycode <= 1000:
             raise ValueError("keycode must be an integer 0..1000")
+        trace_event(
+            "intent.keyevent",
+            device=self.device,
+            category="action",
+            keycode=keycode,
+        )
         out = self._run(["shell", "input", "keyevent", str(keycode)])
         return AdbActionResult(command="keyevent", stdout=out)
 
@@ -100,12 +148,25 @@ class AdbActions:
         if not _SAFE_TEXT_RE.fullmatch(text):
             raise ValueError("text contains characters not qualified for ADB input_text")
         encoded = text.replace(" ", "%s")
+        trace_event(
+            "intent.input_text",
+            device=self.device,
+            category="action",
+            text=text,
+            length=len(text),
+        )
         out = self._run(["shell", "input", "text", encoded])
         return AdbActionResult(command="input_text", stdout=out)
 
     def stop_package(self, package: str) -> AdbActionResult:
         if not _PACKAGE_RE.fullmatch(package):
             raise ValueError("invalid Android package")
+        trace_event(
+            "intent.stop_package",
+            device=self.device,
+            category="action",
+            package=package,
+        )
         out = self._run(["shell", "am", "force-stop", package])
         return AdbActionResult(command="stop_package", stdout=out)
 
@@ -136,6 +197,20 @@ class AdbActions:
         x = round(width * x_fraction)
         start_y = round(height * start_y_fraction)
         end_y = round(height * end_y_fraction)
+        trace_event(
+            "intent.swipe_up_relative",
+            device=self.device,
+            category="action",
+            width=width,
+            height=height,
+            x=x,
+            start_y=start_y,
+            end_y=end_y,
+            duration_ms=duration_ms,
+            x_fraction=x_fraction,
+            start_y_fraction=start_y_fraction,
+            end_y_fraction=end_y_fraction,
+        )
         out = self._run(
             [
                 "shell",

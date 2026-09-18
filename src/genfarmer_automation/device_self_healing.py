@@ -56,6 +56,7 @@ def retryable_client_failure(reason: str | None) -> bool:
         "media file does not exist",
         "candidate file does not contain requested candidate",
         "--dwell must be",
-        "invalid",
+        "--max-app-restarts must be",
+        "demo media file does not exist",
     )
     return not any(marker in lowered for marker in nonretryable)

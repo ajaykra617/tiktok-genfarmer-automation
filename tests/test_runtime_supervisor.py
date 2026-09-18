@@ -293,3 +293,75 @@ def test_hard_restart_fails_closed_when_budget_is_exhausted():
 
     assert actions.stopped == []
     assert runtime.calls == 0
+
+
+def test_app_hung_with_trace_dir_captures_diagnostics_before_recovery(tmp_path, monkeypatch):
+    monkeypatch.setenv("GF_INTERACTION_TRACE_DIR", str(tmp_path))
+    captured = []
+
+    class HungThenHealthyObserver:
+        def __init__(self):
+            self.calls = 0
+
+        def observe(self):
+            self.calls += 1
+            if self.calls == 1:
+                return DeviceObservation(
+                    device="device:5555",
+                    adb_state="device",
+                    foreground_package=TIKTOK_PACKAGE,
+                    foreground_activity="activity",
+                    tiktok_foreground=True,
+                    interrupt=InterruptKind.APP_NOT_RESPONDING,
+                )
+            return DeviceObservation(
+                device="device:5555",
+                adb_state="device",
+                foreground_package=TIKTOK_PACKAGE,
+                foreground_activity="activity",
+                tiktok_foreground=True,
+                interrupt=InterruptKind.NONE,
+            )
+
+    class Recovery:
+        success = True
+        attempts = 1
+        reason = "recovered"
+
+    class Runtime:
+        def __init__(self, *_args, **_kwargs):
+            pass
+
+        def ensure_foreground(self):
+            return Recovery()
+
+    def fake_capture(device, directory, label):
+        captured.append((device, str(directory), label))
+        return SimpleNamespace(
+            process_alive=True,
+            pid="123",
+            foreground_package=TIKTOK_PACKAGE,
+            foreground_activity="activity",
+            anr_detected=True,
+            crash_marker_detected=False,
+            low_memory_marker_detected=False,
+            collection_errors=(),
+        )
+
+    monkeypatch.setattr(
+        "genfarmer_automation.runtime_supervisor.capture_tiktok_runtime_diagnostics",
+        fake_capture,
+    )
+
+    supervisor = TikTokRuntimeSupervisor(
+        "device:5555",
+        observer=HungThenHealthyObserver(),
+        actions=object(),
+        runtime_factory=Runtime,
+        sleeper=lambda _seconds: None,
+    )
+    supervisor.ensure_ready(apply=True)
+
+    assert len(captured) == 1
+    assert captured[0][0] == "device:5555"
+    assert captured[0][2] == "ensure-ready-app-hung"

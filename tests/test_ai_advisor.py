@@ -1,4 +1,5 @@
 import json
+import os
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -13,6 +14,7 @@ from genfarmer_automation.ai_advisor import (
     RecoveryPlanAction,
     build_recovery_plan,
     classify_failure_domain,
+    load_project_env,
     summarize_trace_directory,
 )
 
@@ -224,3 +226,47 @@ def test_modcon_response_is_strictly_validated_with_fake_openai_client():
     assert completions.kwargs["model"] == "gpt-5.6-sol"
     sent = json.dumps(completions.kwargs["messages"])
     assert "192.168.4.138:5555" not in sent
+
+
+def test_project_env_loads_modcon_values_without_overriding_process_env(tmp_path, monkeypatch):
+    env_file = tmp_path / ".env"
+    env_file.write_text(
+        "MODCON_API_KEY=from-file\n"
+        "MODCON_BASE_URL=https://example.invalid/v1\n"
+        "MODCON_MODEL=file-model\n",
+        encoding="utf-8",
+    )
+
+    monkeypatch.setenv("MODCON_API_KEY", "from-process")
+    monkeypatch.delenv("MODCON_BASE_URL", raising=False)
+    monkeypatch.delenv("MODCON_MODEL", raising=False)
+
+    loaded = load_project_env(env_file)
+
+    assert loaded == env_file.resolve()
+    assert os.environ["MODCON_API_KEY"] == "from-process"
+    assert os.environ["MODCON_BASE_URL"] == "https://example.invalid/v1"
+    assert os.environ["MODCON_MODEL"] == "file-model"
+
+
+def test_modcon_advisor_auto_loads_project_env(tmp_path, monkeypatch):
+    env_file = tmp_path / ".env"
+    env_file.write_text(
+        "MODCON_API_KEY=local-secret\n"
+        "MODCON_BASE_URL=https://modcon.example/v1\n"
+        "MODCON_MODEL=test-model\n",
+        encoding="utf-8",
+    )
+    monkeypatch.delenv("MODCON_API_KEY", raising=False)
+    monkeypatch.delenv("MODCON_BASE_URL", raising=False)
+    monkeypatch.delenv("MODCON_MODEL", raising=False)
+    monkeypatch.setattr(
+        "genfarmer_automation.ai_advisor.load_project_env",
+        lambda *args, **kwargs: load_project_env(env_file),
+    )
+
+    advisor = ModConRecoveryAdvisor(client=SimpleNamespace())
+
+    assert advisor.api_key == "local-secret"
+    assert advisor.base_url == "https://modcon.example/v1"
+    assert advisor.model == "test-model"

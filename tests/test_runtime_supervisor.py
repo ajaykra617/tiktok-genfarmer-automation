@@ -190,6 +190,29 @@ def test_observation_adb_timeout_retries_once():
     assert supervisor.snapshot().recovery_budget_used == {"retry_adb": 1}
 
 
+def test_exhausted_hierarchy_failure_escalates_real_anr():
+    observer = DeepFakeObserver(
+        [obs()],
+        [obs(interrupt=InterruptKind.APP_NOT_RESPONDING)],
+    )
+    supervisor = TikTokRuntimeSupervisor(
+        "device:5555",
+        observer=observer,
+        sleeper=lambda _seconds: None,
+        budget=RecoveryBudget(RecoveryLimits(hierarchy_retries=0)),
+    )
+
+    def operation():
+        raise RuntimeError(
+            "no healthy hierarchy source after helper-service recovery and compressed/standard uiautomator fallback"
+        )
+
+    with pytest.raises(RuntimeSupervisorError, match="app-not-responding while hierarchy sources"):
+        supervisor.run_read_only(operation)
+
+    assert observer.deep_index == 1
+
+
 def test_read_only_hierarchy_operation_retries_once():
     calls = {"n": 0}
     supervisor = TikTokRuntimeSupervisor("device:5555", observer=FakeObserver([obs()]), sleeper=lambda _s: None)

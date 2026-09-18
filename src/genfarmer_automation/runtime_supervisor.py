@@ -269,6 +269,20 @@ class TikTokRuntimeSupervisor:
                 if decision.action not in {RecoveryAction.RETRY_HIERARCHY, RecoveryAction.RETRY_ADB}:
                     raise
                 if not self.budget.consume(decision):
+                    if decision.action is RecoveryAction.RETRY_HIERARCHY:
+                        # A frozen TikTok process can poison every accessibility
+                        # provider. Before surfacing an exhausted hierarchy error,
+                        # perform one strong read-only runtime observation so the
+                        # checkpoint layer can distinguish provider failure from
+                        # a real Android ANR and spend the app-restart budget on
+                        # the correct failure domain.
+                        observation = self._observe_checkpoint_with_retry()
+                        runtime_decision = classify_observation(observation)
+                        if runtime_decision.kind is RuntimeFailureKind.APP_HUNG:
+                            raise RuntimeSupervisorError(
+                                "TikTok/Android reported app-not-responding while "
+                                "hierarchy sources were unavailable"
+                            ) from exc
                     raise
                 if self.retry_sleep_seconds:
                     self.sleeper(self.retry_sleep_seconds)

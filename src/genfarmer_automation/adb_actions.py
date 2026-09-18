@@ -10,8 +10,9 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 import re
-import subprocess
 from typing import Iterable
+
+from .adb_transport import AdbTransport, AdbTransportError
 
 
 class AdbActionError(RuntimeError):

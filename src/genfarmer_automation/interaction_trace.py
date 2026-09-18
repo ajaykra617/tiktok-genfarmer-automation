@@ -17,11 +17,13 @@ context.
 from __future__ import annotations
 
 from datetime import datetime, timezone
+import hashlib
 import itertools
 import json
 import os
 from pathlib import Path
 import re
+import sys
 import threading
 import time
 from typing import Any, Mapping
@@ -61,12 +63,40 @@ def _jsonable(value: Any) -> Any:
     if value is None or isinstance(value, (str, int, float, bool)):
         return value
     if isinstance(value, bytes):
-        return value.decode("utf-8", errors="replace")
+        return truncate_text(value, 800)
     if isinstance(value, Mapping):
         return {str(key): _jsonable(item) for key, item in value.items()}
     if isinstance(value, (list, tuple, set, frozenset)):
         return [_jsonable(item) for item in value]
     return str(value)
+
+
+def console_safe_text(value: str, encoding: str | None = None) -> str:
+    """Return text that cannot raise UnicodeEncodeError on the active console."""
+    text = str(value)
+    target = encoding or getattr(sys.stdout, "encoding", None) or "utf-8"
+    try:
+        return text.encode(target, errors="backslashreplace").decode(target, errors="strict")
+    except (LookupError, UnicodeError):
+        return text.encode("ascii", errors="backslashreplace").decode("ascii")
+
+
+def _bytes_trace_text(value: bytes) -> str:
+    """Render textual bytes, summarize binary bytes without dumping payload."""
+    try:
+        decoded = value.decode("utf-8", errors="strict")
+    except UnicodeDecodeError:
+        digest = hashlib.sha256(value).hexdigest()
+        return f"<binary bytes={len(value)} sha256={digest}>"
+
+    control_count = sum(
+        1 for char in decoded
+        if ord(char) < 32 and char not in "\r\n\t"
+    )
+    if decoded and control_count / max(1, len(decoded)) > 0.01:
+        digest = hashlib.sha256(value).hexdigest()
+        return f"<binary bytes={len(value)} sha256={digest}>"
+    return decoded
 
 
 def _trace_file(root: Path, device: str | None) -> Path:
@@ -112,11 +142,11 @@ def trace_event(
         compact = json.dumps(payload["details"], ensure_ascii=False, separators=(",", ":"))
         if len(compact) > 900:
             compact = compact[:897] + "..."
-        print(
+        rendered = (
             f"TRACE {seq:04d} +{elapsed:8.3f}s "
-            f"[{payload['device'] or '-'}] {category}.{event} {compact}",
-            flush=True,
+            f"[{payload['device'] or '-'}] {category}.{event} {compact}"
         )
+        print(console_safe_text(rendered), flush=True)
     return seq
 
 
@@ -184,12 +214,12 @@ def trace_text_artifact(
         with trace_path.open("a", encoding="utf-8") as handle:
             handle.write(line + "\n")
     if _truthy(os.environ.get("GF_INTERACTION_TRACE_CONSOLE")):
-        print(
+        rendered = (
             f"TRACE {seq:04d} +{elapsed:8.3f}s "
             f"[{payload['device'] or '-'}] {category}.artifact "
-            f"label={label!r} path={path}",
-            flush=True,
+            f"label={label!r} path={path}"
         )
+        print(console_safe_text(rendered), flush=True)
     return str(path)
 
 
@@ -197,7 +227,7 @@ def truncate_text(value: str | bytes | None, limit: int = 800) -> str:
     if value is None:
         return ""
     if isinstance(value, bytes):
-        text = value.decode("utf-8", errors="replace")
+        text = _bytes_trace_text(value)
     else:
         text = str(value)
     text = text.replace("\x00", "\\0")

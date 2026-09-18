@@ -184,10 +184,18 @@ def main() -> int:
             reboot_recommended = policy.reboot_approval_recommended(consecutive_failures)
             print(f"Client cycle blocked: {reason}")
             print(f"State: {DeviceWorkerState.APP_RECOVERY.value}")
-            recovery = recover_tiktok_without_reboot(
-                args.device,
-                private / "app-recovery",
-            )
+            recovery = None
+            recovery_error = None
+            try:
+                recovery = recover_tiktok_without_reboot(
+                    args.device,
+                    private / "app-recovery",
+                )
+            except Exception as exc:
+                # The persistent worker itself must survive a failed recovery
+                # attempt. Record it, cool down, and let the next cycle retry
+                # from a fresh health check.
+                recovery_error = str(exc) or exc.__class__.__name__
             cooldown = policy.cooldown_for_failure(consecutive_failures)
             state = (
                 DeviceWorkerState.REBOOT_APPROVAL_RECOMMENDED
@@ -200,11 +208,11 @@ def main() -> int:
                 "client_status": child_status,
                 "reason": reason,
                 "recovery_used": True,
-                "app_recovery_success": recovery.success,
-                "force_stop_attempts": recovery.force_stop_attempts,
-                "process_gone": recovery.process_gone,
-                "stable_foreground": recovery.stable_foreground,
-                "app_recovery_reason": recovery.reason,
+                "app_recovery_success": bool(recovery and recovery.success),
+                "force_stop_attempts": recovery.force_stop_attempts if recovery else 0,
+                "process_gone": recovery.process_gone if recovery else False,
+                "stable_foreground": recovery.stable_foreground if recovery else False,
+                "app_recovery_reason": recovery.reason if recovery else recovery_error,
                 "reboot_recommended": reboot_recommended,
                 "reboot_attempted": False,
                 "cooldown_seconds": cooldown,
@@ -217,7 +225,7 @@ def main() -> int:
             if reboot_recommended:
                 print("REBOOT APPROVAL RECOMMENDED: repeated app recovery failures; reboot is disabled")
             print(
-                f"App recovery: {'PASS' if recovery.success else 'FAILED'}; "
+                f"App recovery: {'PASS' if recovery and recovery.success else 'FAILED'}; "
                 f"cooldown={cooldown:.1f}s; reboot=NOT ATTEMPTED"
             )
 

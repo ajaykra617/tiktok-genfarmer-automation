@@ -33,7 +33,6 @@ from genfarmer_automation.native_ui import (  # noqa: E402
     NativeUiError,
     NativeUiNotFound,
     collect_nodes,
-    find_editable_node,
     find_exact_semantic_node,
     find_semantic_node,
 )

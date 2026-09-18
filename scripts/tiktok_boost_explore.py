@@ -33,7 +33,6 @@ from genfarmer_automation.native_ui import (  # noqa: E402
     NativeUiError,
     NativeUiNotFound,
     collect_nodes,
-    find_editable_node,
     find_exact_semantic_node,
     find_semantic_node,
 )
@@ -41,6 +40,7 @@ from genfarmer_automation.runtime_supervisor import (  # noqa: E402
     RuntimeSupervisorError,
     TikTokRuntimeSupervisor,
 )
+from genfarmer_automation.search_entry import wait_for_search_editable  # noqa: E402
 
 TIKTOK_PACKAGE = "com.zhiliaoapp.musically"
 
@@ -196,11 +196,28 @@ def main() -> int:
             time.sleep(1.5)
             supervisor.ensure_ready(apply=True)
 
-            xml, provider2 = supervisor.run_read_only(
-                lambda: _capture(args.device, args.preferred_hierarchy_port)
+            search_entry_captures: list[tuple[str, str]] = []
+
+            def capture_search_entry() -> str:
+                xml_value, provider_value = supervisor.run_read_only(
+                    lambda: _capture(args.device, args.preferred_hierarchy_port)
+                )
+                search_entry_captures.append((xml_value, provider_value))
+                attempt_number = len(search_entry_captures)
+                (private / f"search-entry-{attempt_number}.xml").write_text(
+                    xml_value,
+                    encoding="utf-8",
+                )
+                return xml_value
+
+            search_entry = wait_for_search_editable(
+                capture_search_entry,
+                package=TIKTOK_PACKAGE,
             )
+            xml = search_entry.xml
+            provider2 = search_entry_captures[-1][1]
             (private / "search-entry.xml").write_text(xml, encoding="utf-8")
-            edit = find_editable_node(xml, package=TIKTOK_PACKAGE, hints=("Search",))
+            edit = search_entry.node
             actions.tap(*edit.center)
             actions.input_text(query)
             actions.keyevent(66)  # ENTER
@@ -254,6 +271,7 @@ def main() -> int:
                     "context_verified": "query_visible",
                     "specialized_tab_selected": tab_selected,
                     "hierarchy_providers": sorted({provider, provider2, provider3}),
+                    "search_entry_attempts": search_entry.attempts,
                     "screenshot_captured": screenshot_captured,
                 }
             )

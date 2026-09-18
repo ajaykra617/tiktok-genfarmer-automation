@@ -175,16 +175,28 @@ def main() -> int:
                 pass
 
     failures = 0
+    resource_waits = 0
     print("=" * 78)
     print("PARALLEL DIAGNOSTIC RESULT")
     print("=" * 78)
     for name, serial in args.device:
         returncode = procs[name].wait()
-        failures += int(returncode != 0)
-        print(f"{name}: serial={serial} exit={returncode}")
+        if returncode == 0:
+            status = "READY_FOR_PUBLISH"
+        elif returncode == 3:
+            status = "WAITING_RESOURCE"
+            resource_waits += 1
+        else:
+            status = "FAILED"
+            failures += 1
+        print(f"{name}: serial={serial} status={status} exit={returncode}")
     print(f"Combined logs: {out.relative_to(ROOT)}")
     print("=" * 78)
-    return 0 if failures == 0 else 1
+    if failures:
+        return 1
+    if resource_waits:
+        return 3
+    return 0
 
 
 if __name__ == "__main__":

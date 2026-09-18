@@ -73,3 +73,11 @@ def test_parallel_launcher_propagates_ai_advisor_flags():
     assert "--ai-advisor" in cmd
     assert "--ai-timeout" in cmd
     assert cmd[cmd.index("--ai-timeout") + 1] == "17.0"
+
+
+def test_parallel_result_distinguishes_resource_wait_from_device_failure():
+    module = load_script()
+    assert module._worker_exit_status(0) == "READY_FOR_PUBLISH"
+    assert module._worker_exit_status(3) == "WAITING_RESOURCE"
+    assert module._worker_exit_status(1) == "FAILED"
+    assert module._worker_exit_status(130) == "FAILED"

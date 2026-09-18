@@ -135,7 +135,7 @@ def classify_failure_domain(reason: str | None) -> FailureDomain:
     media_markers = (
         "no pending unreserved approved media",
         "no unreserved approved media",
-        "approved media is available",
+        "approved media is unavailable",
         "media inventory exhausted",
         "media reservation unavailable",
     )
@@ -577,6 +577,11 @@ def build_recovery_plan(
     action = RecoveryPlanAction(decision.action.value)
     reboot_recommended = action is RecoveryPlanAction.RECOMMEND_REBOOT_APPROVAL
 
+    # "Recommend reboot" is advisory only. Continue using the safe deterministic
+    # action underneath it because reboot is outside the approved execution set.
+    if reboot_recommended:
+        action = deterministic_default.action
+
     # A model must never convert an unknown error into an aggressive recovery with
     # high confidence based on no useful trace evidence. Require some trace signal.
     if (
@@ -586,9 +591,10 @@ def build_recovery_plan(
     ):
         action = RecoveryPlanAction.COOLDOWN_ONLY
 
+    resolved_domain = decision.failure_domain if domain is FailureDomain.UNKNOWN else domain
     return RecoveryPlan(
         action=action,
-        failure_domain=decision.failure_domain,
+        failure_domain=resolved_domain,
         source="modcon",
         rationale=decision.rationale,
         advisor_decision=decision,

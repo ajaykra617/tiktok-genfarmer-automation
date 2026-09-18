@@ -16,6 +16,7 @@ import time
 import tiktok_client_demo as demo
 
 from genfarmer_automation.fyp_context import FypState, classify_fyp_context
+from genfarmer_automation.fyp_settle_policy import settle_policy
 from genfarmer_automation.native_ui import NativeUiError
 from genfarmer_automation.warmup_features import find_feed_source_node
 
@@ -46,15 +47,16 @@ def _settle_fyp_state(supervisor, device: str, candidate, preferred_port: int):
 
     current_restarts = _restart_count(supervisor)
     post_restart = current_restarts > _SETTLED_RESTART_COUNT
-    checks = 15 if post_restart else 3
-    interval = 1.0 if post_restart else 0.6
+    policy = settle_policy(post_restart=post_restart)
+    checks = policy.checks
+    interval = policy.interval_seconds
     last = None
 
     # Checkpoint-level health is stronger than the per-second watch-loop health
     # check: use ProcessRecord-aware deep observations before interpreting UI.
     supervisor.ensure_stable(
         apply=True,
-        consecutive=3 if post_restart else 2,
+        consecutive=policy.stable_observations,
         interval_seconds=0.25,
     )
 

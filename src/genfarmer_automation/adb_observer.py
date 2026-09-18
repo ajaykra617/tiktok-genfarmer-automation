@@ -20,9 +20,9 @@ from dataclasses import asdict, dataclass
 from enum import Enum
 from pathlib import Path
 import re
-import subprocess
 from typing import Iterable
 
+from .adb_transport import AdbTransport, AdbTransportError
 from .screen_state import RawScreenFrame, parse_android_raw_screencap
 
 TIKTOK_PACKAGE = "com.zhiliaoapp.musically"

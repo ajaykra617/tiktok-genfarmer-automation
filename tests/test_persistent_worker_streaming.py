@@ -1,5 +1,6 @@
 import importlib.util
 from pathlib import Path
+import os
 import sys
 
 
@@ -22,7 +23,7 @@ def test_child_streamer_tees_output_to_memory_and_file(tmp_path):
         [sys.executable, "-c", "print(\'trace-line\')"],
         cwd=ROOT,
         timeout=10.0,
-        env={},
+        env=os.environ.copy(),
         log_path=log,
     )
     assert returncode == 0

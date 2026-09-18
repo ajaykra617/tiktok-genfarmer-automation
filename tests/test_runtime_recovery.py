@@ -66,6 +66,13 @@ def test_classify_adb_timeout_is_transient():
     assert decision.kind is RuntimeFailureKind.ADB_TRANSIENT
     assert decision.action is RecoveryAction.RETRY_ADB
 
+def test_classify_resilient_adb_read_timeout_is_transient():
+    decision = classify_error(
+        "adb read-only command timed out after 5.0s; transport recovery did not restore a healthy channel"
+    )
+    assert decision.kind is RuntimeFailureKind.ADB_TRANSIENT
+    assert decision.action is RecoveryAction.RETRY_ADB
+
 
 def test_unknown_semantic_failure_fails_closed():
     decision = classify_error("expected unique Comments control but found 2")

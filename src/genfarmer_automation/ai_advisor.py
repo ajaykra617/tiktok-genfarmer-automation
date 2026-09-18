@@ -479,14 +479,15 @@ class ModConRecoveryAdvisor:
         )
         user = json.dumps(context.redacted_payload(), ensure_ascii=False, separators=(",", ":"))
         try:
+            # Keep the request surface deliberately small for OpenAI-compatible
+            # gateways. Strict JSON is enforced by the prompt and local parser,
+            # rather than relying on provider-specific response_format support.
             response = client.chat.completions.create(
                 model=self.model,
                 messages=[
                     {"role": "system", "content": system},
                     {"role": "user", "content": user},
                 ],
-                response_format={"type": "json_object"},
-                temperature=0,
             )
         except Exception as exc:
             raise AdvisorError(f"ModCon advisor request failed: {exc}") from exc

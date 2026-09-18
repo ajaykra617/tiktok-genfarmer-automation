@@ -18,6 +18,8 @@ import tiktok_client_demo as demo
 from genfarmer_automation.fyp_context import FypState, classify_fyp_context
 from genfarmer_automation.fyp_settle_policy import settle_policy
 from genfarmer_automation.native_ui import NativeUiError
+from genfarmer_automation.interaction_trace import trace_event, trace_text_artifact
+from genfarmer_automation.live_diagnostics import live_hint_summary
 from genfarmer_automation.warmup_features import find_feed_source_node
 
 TIKTOK_PACKAGE = "com.zhiliaoapp.musically"
@@ -31,8 +33,47 @@ def _restart_count(supervisor) -> int:
 
 
 def _read_fyp_state(supervisor, device: str, candidate, preferred_port: int):
+    trace_event(
+        "fyp-read.begin",
+        device=device,
+        category="fyp",
+        preferred_port=preferred_port,
+    )
     gate, batch = demo._gate(supervisor, device, candidate, preferred_port)
-    proof = classify_fyp_context(batch.snapshots[-1], package=TIKTOK_PACKAGE)
+    latest_xml = batch.snapshots[-1]
+    proof = classify_fyp_context(latest_xml, package=TIKTOK_PACKAGE)
+    live = live_hint_summary(latest_xml, package=TIKTOK_PACKAGE)
+
+    for index, snapshot in enumerate(batch.snapshots, start=1):
+        trace_text_artifact(
+            f"fyp-{proof.state.value}-sample-{index}",
+            snapshot,
+            device=device,
+            suffix=".xml",
+            category="hierarchy",
+            provider=batch.provider,
+            remote_port=batch.remote_port,
+            gate_counts=gate.counts,
+            gate_passed=gate.passed,
+            fyp_state=proof.state.value,
+            fyp_signals=proof.signals,
+            live_detected=live["detected"],
+            live_hint_count=live["count"],
+        )
+
+    trace_event(
+        "fyp-read.end",
+        device=device,
+        category="fyp",
+        provider=batch.provider,
+        remote_port=batch.remote_port,
+        provider_attempts=batch.attempts,
+        gate_passed=gate.passed,
+        gate_counts=gate.counts,
+        fyp_state=proof.state.value,
+        fyp_signals=proof.signals,
+        live=live,
+    )
     return gate, batch, proof
 
 
@@ -60,6 +101,17 @@ def _settle_fyp_state(supervisor, device: str, candidate, preferred_port: int):
         interval_seconds=0.25,
     )
 
+    trace_event(
+        "settle.begin",
+        device=device,
+        category="fyp",
+        post_restart=post_restart,
+        current_restarts=current_restarts,
+        checks=checks,
+        interval_seconds=interval,
+        stable_observations=policy.stable_observations,
+    )
+
     if post_restart:
         print("      POST-RESTART SETTLE: waiting for stable TikTok content")
 
@@ -70,10 +122,30 @@ def _settle_fyp_state(supervisor, device: str, candidate, preferred_port: int):
         supervisor.ensure_ready(apply=True)
         gate, batch, proof = _read_fyp_state(supervisor, device, candidate, preferred_port)
         last = (gate, batch, proof)
+        trace_event(
+            "settle.check",
+            device=device,
+            category="fyp",
+            check=index + 1,
+            checks=checks,
+            gate_passed=gate.passed,
+            gate_counts=gate.counts,
+            fyp_state=proof.state.value,
+            fyp_signals=proof.signals,
+        )
         if gate.passed or proof.state is FypState.CONTENT:
             if post_restart:
                 print(f"      POST-RESTART SETTLE: content ready after {index + 1} check(s)")
                 _SETTLED_RESTART_COUNT = current_restarts
+            trace_event(
+                "settle.content-ready",
+                device=device,
+                category="fyp",
+                check=index + 1,
+                gate_passed=gate.passed,
+                fyp_state=proof.state.value,
+                fyp_signals=proof.signals,
+            )
             return last
 
         # A readable For You shell with no content is not a crash. Wait without
@@ -94,7 +166,24 @@ def _settle_fyp_state(supervisor, device: str, candidate, preferred_port: int):
         print("      POST-RESTART SETTLE: process healthy; semantic restore required")
 
     if last is None:
+        trace_event(
+            "settle.failed",
+            device=device,
+            category="fyp",
+            level="ERROR",
+            reason="no-observation",
+        )
         raise RuntimeError("TikTok FYP state could not be observed")
+    trace_event(
+        "settle.exhausted",
+        device=device,
+        category="fyp",
+        level="ERROR",
+        gate_passed=last[0].passed,
+        gate_counts=last[0].counts,
+        fyp_state=last[2].state.value,
+        fyp_signals=last[2].signals,
+    )
     return last
 
 
@@ -113,19 +202,53 @@ def _is_live_survey(xml: str) -> bool:
 def _dismiss_live_survey(supervisor) -> None:
     if supervisor.actions is None:
         raise RuntimeError("LIVE survey recovery requires bounded Android actions")
+    trace_event(
+        "live-survey.dismiss.begin",
+        device=supervisor.device,
+        category="live",
+        action="KEYCODE_BACK",
+    )
     print("      FYP VARIANT: live-survey; dismissing passive overlay with BACK")
     supervisor.actions.keyevent(4)
     time.sleep(0.8)
     supervisor.ensure_ready(apply=True)
+    trace_event(
+        "live-survey.dismiss.end",
+        device=supervisor.device,
+        category="live",
+        result="healthy-runtime-proven",
+    )
 
 
-def _advance_alternate_fyp(supervisor) -> None:
+def _advance_alternate_fyp(supervisor, *, signals=()) -> None:
     if supervisor.actions is None:
         raise RuntimeError("FYP variant recovery requires bounded Android actions")
     frame = supervisor.run_read_only(supervisor.observer.capture_raw_frame)
+    trace_event(
+        "variant-advance.begin",
+        device=supervisor.device,
+        category="live" if "live-card" in signals else "fyp",
+        signals=signals,
+        width=frame.width,
+        height=frame.height,
+        action="swipe_up_relative",
+    )
     supervisor.actions.swipe_up_relative(width=frame.width, height=frame.height)
+    trace_event(
+        "variant-advance.mutation-returned",
+        device=supervisor.device,
+        category="live" if "live-card" in signals else "fyp",
+        signals=signals,
+    )
     time.sleep(1.0)
     supervisor.ensure_ready(apply=True)
+    trace_event(
+        "variant-advance.end",
+        device=supervisor.device,
+        category="live" if "live-card" in signals else "fyp",
+        signals=signals,
+        result="runtime-healthy-after-swipe",
+    )
 
 
 def resilient_prove_feed(supervisor, device: str, candidate, preferred_port: int):
@@ -150,7 +273,7 @@ def resilient_prove_feed(supervisor, device: str, candidate, preferred_port: int
                 + ",".join(proof.signals)
                 + "; advancing safely without restarting TikTok"
             )
-            _advance_alternate_fyp(supervisor)
+            _advance_alternate_fyp(supervisor, signals=proof.signals)
             continue
 
         if proof.state is FypState.LOADING:
@@ -196,7 +319,7 @@ def resilient_restore_fyp(
                 + ",".join(proof.signals)
                 + "; seeking ordinary feed card"
             )
-            _advance_alternate_fyp(supervisor)
+            _advance_alternate_fyp(supervisor, signals=proof.signals)
             continue
 
         if proof.state is FypState.LOADING:

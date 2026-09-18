@@ -61,7 +61,19 @@ def _worker_command(args, serial: str) -> list[str]:
         "--max-app-restarts", str(args.max_app_restarts),
         "--max-cycles", str(args.max_cycles),
         "--preferred-hierarchy-port", str(args.preferred_hierarchy_port),
-    ]
+    ] + (
+        ["--ai-advisor", "--ai-timeout", str(args.ai_timeout)]
+        if getattr(args, "ai_advisor", False)
+        else []
+    )
+
+
+def _worker_exit_status(returncode: int) -> str:
+    if returncode == 0:
+        return "READY_FOR_PUBLISH"
+    if returncode == 3:
+        return "WAITING_RESOURCE"
+    return "FAILED"
 
 
 def main() -> int:
@@ -81,6 +93,12 @@ def main() -> int:
     ap.add_argument("--max-app-restarts", type=int, default=3)
     ap.add_argument("--max-cycles", type=int, default=2)
     ap.add_argument("--preferred-hierarchy-port", type=int, default=8912)
+    ap.add_argument(
+        "--ai-advisor",
+        action="store_true",
+        help="enable constrained ModCon recovery advice in each device worker",
+    )
+    ap.add_argument("--ai-timeout", type=float, default=20.0)
     args = ap.parse_args()
 
     names = [name for name, _serial in args.device]
@@ -165,16 +183,25 @@ def main() -> int:
                 pass
 
     failures = 0
+    resource_waits = 0
     print("=" * 78)
     print("PARALLEL DIAGNOSTIC RESULT")
     print("=" * 78)
     for name, serial in args.device:
         returncode = procs[name].wait()
-        failures += int(returncode != 0)
-        print(f"{name}: serial={serial} exit={returncode}")
+        status = _worker_exit_status(returncode)
+        if status == "WAITING_RESOURCE":
+            resource_waits += 1
+        elif status == "FAILED":
+            failures += 1
+        print(f"{name}: serial={serial} status={status} exit={returncode}")
     print(f"Combined logs: {out.relative_to(ROOT)}")
     print("=" * 78)
-    return 0 if failures == 0 else 1
+    if failures:
+        return 1
+    if resource_waits:
+        return 3
+    return 0
 
 
 if __name__ == "__main__":

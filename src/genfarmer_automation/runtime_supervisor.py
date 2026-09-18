@@ -19,11 +19,15 @@ TikTok data/cache, never reinstalls the app, and never kills unrelated apps.
 from __future__ import annotations
 
 from dataclasses import dataclass
+import os
+from pathlib import Path
 import time
 from typing import Any, Callable, TypeVar
 
 from .adb_observer import AdbObserver, TIKTOK_PACKAGE
+from .interaction_trace import trace_event, trace_exception
 from .permission_recovery import recover_tiktok_permission_dialog
+from .runtime_diagnostics import capture_tiktok_runtime_diagnostics
 from .runtime_recovery import (
     RecoveryAction,
     RecoveryBudget,
@@ -74,6 +78,53 @@ class TikTokRuntimeSupervisor:
     def snapshot(self) -> RuntimeSupervisorSnapshot:
         return RuntimeSupervisorSnapshot(self.budget.snapshot())
 
+    def _capture_app_hung_diagnostics(self, *, phase: str, reason: str) -> None:
+        """Best-effort ANR evidence capture when private tracing is enabled."""
+        trace_root = os.environ.get("GF_INTERACTION_TRACE_DIR")
+        if not trace_root:
+            return
+        out = Path(trace_root) / "runtime-diagnostics"
+        label = f"{phase}-app-hung"
+        trace_event(
+            "anr-diagnostics.begin",
+            device=self.device,
+            category="recovery",
+            phase=phase,
+            reason=reason,
+            directory=str(out),
+        )
+        try:
+            summary = capture_tiktok_runtime_diagnostics(
+                self.device,
+                out,
+                label,
+            )
+        except Exception as exc:
+            trace_exception(
+                "anr-diagnostics.error",
+                exc,
+                device=self.device,
+                category="recovery",
+                phase=phase,
+                reason=reason,
+            )
+            return
+        trace_event(
+            "anr-diagnostics.end",
+            device=self.device,
+            category="recovery",
+            phase=phase,
+            reason=reason,
+            process_alive=summary.process_alive,
+            pid=summary.pid,
+            foreground_package=summary.foreground_package,
+            foreground_activity=summary.foreground_activity,
+            anr_detected=summary.anr_detected,
+            crash_marker_detected=summary.crash_marker_detected,
+            low_memory_marker_detected=summary.low_memory_marker_detected,
+            collection_errors=summary.collection_errors,
+        )
+
     def _observe_with_retry(self):
         while True:
             try:
@@ -107,6 +158,22 @@ class TikTokRuntimeSupervisor:
             decision = classify_observation(observation)
             if decision.kind is RuntimeFailureKind.HEALTHY:
                 return
+            trace_event(
+                "runtime-decision",
+                device=self.device,
+                category="recovery",
+                phase="ensure_ready",
+                failure_kind=decision.kind.value,
+                action=decision.action.value,
+                retryable=decision.retryable,
+                reason=decision.reason,
+                budget_used=self.budget.snapshot(),
+            )
+            if decision.kind is RuntimeFailureKind.APP_HUNG:
+                self._capture_app_hung_diagnostics(
+                    phase="ensure-ready",
+                    reason=decision.reason,
+                )
             if not apply:
                 raise RuntimeSupervisorError(decision.reason)
             if not self.budget.consume(decision):
@@ -125,10 +192,37 @@ class TikTokRuntimeSupervisor:
                 kwargs = {"observer": self.observer}
                 if self.actions is not None:
                     kwargs["actions"] = self.actions
+                trace_event(
+                    "runtime-recovery.begin",
+                    device=self.device,
+                    category="recovery",
+                    phase="ensure_ready",
+                    action=decision.action.value,
+                    reason=decision.reason,
+                )
                 recovered = self.runtime_factory(self.device, **kwargs).ensure_foreground()
                 if not getattr(recovered, "success", False):
                     reason = getattr(recovered, "reason", "TikTok runtime recovery failed")
+                    trace_event(
+                        "runtime-recovery.end",
+                        device=self.device,
+                        category="recovery",
+                        phase="ensure_ready",
+                        action=decision.action.value,
+                        success=False,
+                        reason=reason,
+                    )
                     raise RuntimeSupervisorError(f"TikTok runtime recovery failed: {reason}")
+                trace_event(
+                    "runtime-recovery.end",
+                    device=self.device,
+                    category="recovery",
+                    phase="ensure_ready",
+                    action=decision.action.value,
+                    success=True,
+                    attempts=getattr(recovered, "attempts", None),
+                    reason=getattr(recovered, "reason", None),
+                )
                 continue
 
             raise RuntimeSupervisorError(decision.reason)
@@ -173,6 +267,24 @@ class TikTokRuntimeSupervisor:
                 continue
 
             healthy = 0
+            trace_event(
+                "runtime-decision",
+                device=self.device,
+                category="recovery",
+                phase="ensure_stable",
+                failure_kind=decision.kind.value,
+                action=decision.action.value,
+                retryable=decision.retryable,
+                reason=decision.reason,
+                budget_used=self.budget.snapshot(),
+                consecutive_healthy=healthy,
+                attempt=attempts,
+            )
+            if decision.kind is RuntimeFailureKind.APP_HUNG:
+                self._capture_app_hung_diagnostics(
+                    phase="ensure-stable",
+                    reason=decision.reason,
+                )
             if not apply:
                 raise RuntimeSupervisorError(decision.reason)
 
@@ -193,10 +305,37 @@ class TikTokRuntimeSupervisor:
                 kwargs = {"observer": self.observer}
                 if self.actions is not None:
                     kwargs["actions"] = self.actions
+                trace_event(
+                    "runtime-recovery.begin",
+                    device=self.device,
+                    category="recovery",
+                    phase="ensure_stable",
+                    action=decision.action.value,
+                    reason=decision.reason,
+                )
                 recovered = self.runtime_factory(self.device, **kwargs).ensure_foreground()
                 if not getattr(recovered, "success", False):
                     reason = getattr(recovered, "reason", "TikTok runtime recovery failed")
+                    trace_event(
+                        "runtime-recovery.end",
+                        device=self.device,
+                        category="recovery",
+                        phase="ensure_stable",
+                        action=decision.action.value,
+                        success=False,
+                        reason=reason,
+                    )
                     raise RuntimeSupervisorError(f"TikTok runtime recovery failed: {reason}")
+                trace_event(
+                    "runtime-recovery.end",
+                    device=self.device,
+                    category="recovery",
+                    phase="ensure_stable",
+                    action=decision.action.value,
+                    success=True,
+                    attempts=getattr(recovered, "attempts", None),
+                    reason=getattr(recovered, "reason", None),
+                )
             else:
                 raise RuntimeSupervisorError(decision.reason)
 

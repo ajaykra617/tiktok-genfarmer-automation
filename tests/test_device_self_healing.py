@@ -1,6 +1,7 @@
 import pytest
 
 from genfarmer_automation.device_self_healing import (
+    DeviceWorkerState,
     SelfHealingPolicy,
     retryable_client_failure,
 )
@@ -35,3 +36,7 @@ def test_policy_rejects_invalid_values():
         SelfHealingPolicy(cooldown_seconds=())
     with pytest.raises(ValueError):
         SelfHealingPolicy(reboot_recommend_after=0)
+
+
+def test_shared_resource_wait_has_distinct_worker_state():
+    assert DeviceWorkerState.WAITING_RESOURCE.value == "waiting_resource"

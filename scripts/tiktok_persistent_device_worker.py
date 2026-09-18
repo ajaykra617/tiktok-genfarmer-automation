@@ -11,10 +11,13 @@ from __future__ import annotations
 import argparse
 from datetime import datetime, timezone
 import json
+import os
 from pathlib import Path
+import queue
 import re
 import subprocess
 import sys
+import threading
 import time
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -29,6 +32,7 @@ from genfarmer_automation.device_self_healing import (  # noqa: E402
     retryable_client_failure,
 )
 from genfarmer_automation.warmup_session import load_shareable  # noqa: E402
+from genfarmer_automation.interaction_trace import console_safe_text, trace_event, trace_exception  # noqa: E402
 
 
 def _write_json(path: Path, value) -> None:
@@ -42,6 +46,102 @@ def _last_error(output: str) -> str | None:
         if line.startswith("ERROR:"):
             return line[6:].strip()
     return lines[-1] if lines else None
+
+
+def _run_child_streamed(
+    cmd: list[str],
+    *,
+    cwd: Path,
+    timeout: float,
+    env: dict[str, str],
+    log_path: Path,
+) -> tuple[int, str, bool]:
+    """Run a child while teeing every output line live to console and disk."""
+    log_path.parent.mkdir(parents=True, exist_ok=True)
+    proc = subprocess.Popen(
+        cmd,
+        cwd=cwd,
+        text=True,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
+        bufsize=1,
+        env=env,
+        encoding="utf-8",
+        errors="backslashreplace",
+    )
+    lines: queue.Queue[str | None] = queue.Queue()
+
+    def reader() -> None:
+        assert proc.stdout is not None
+        try:
+            for line in proc.stdout:
+                lines.put(line)
+        finally:
+            lines.put(None)
+
+    thread = threading.Thread(
+        target=reader,
+        name=f"worker-child-reader-{proc.pid}",
+        daemon=True,
+    )
+    thread.start()
+
+    deadline = time.monotonic() + timeout
+    parts: list[str] = []
+    reached_eof = False
+    timed_out = False
+
+    with log_path.open("w", encoding="utf-8", errors="replace") as handle:
+        while not reached_eof:
+            remaining = deadline - time.monotonic()
+            if remaining <= 0:
+                timed_out = True
+                trace_event(
+                    "child.timeout",
+                    category="worker",
+                    child_pid=proc.pid,
+                    timeout_seconds=timeout,
+                )
+                try:
+                    proc.terminate()
+                    proc.wait(timeout=3.0)
+                except Exception:
+                    try:
+                        proc.kill()
+                    except Exception:
+                        pass
+                timeout_line = "ERROR: client demo subprocess exceeded worker deadline\n"
+                print(console_safe_text(timeout_line), end="", flush=True)
+                handle.write(timeout_line)
+                handle.flush()
+                parts.append(timeout_line)
+                break
+
+            try:
+                item = lines.get(timeout=min(0.25, max(0.01, remaining)))
+            except queue.Empty:
+                if proc.poll() is not None and not thread.is_alive():
+                    break
+                continue
+
+            if item is None:
+                reached_eof = True
+                continue
+
+            print(console_safe_text(item), end="", flush=True)
+            handle.write(item)
+            handle.flush()
+            parts.append(item)
+
+    if timed_out:
+        try:
+            proc.wait(timeout=1.0)
+        except Exception:
+            pass
+        return 124, "".join(parts), True
+
+    returncode = proc.wait()
+    return returncode, "".join(parts), False
 
 
 def _client_command(args) -> list[str]:
@@ -123,28 +223,53 @@ def main() -> int:
             print(f"State: {DeviceWorkerState.RUNNING.value}")
             print("=" * 78)
 
-            try:
-                proc = subprocess.run(
-                    _client_command(args),
-                    cwd=ROOT,
-                    text=True,
-                    stdout=subprocess.PIPE,
-                    stderr=subprocess.STDOUT,
-                    timeout=args.child_timeout,
-                    check=False,
-                )
-                output = proc.stdout or ""
-                returncode = proc.returncode
-            except subprocess.TimeoutExpired as exc:
-                output = (exc.stdout or "") if isinstance(exc.stdout, str) else ""
-                output += "\nERROR: client demo subprocess exceeded worker deadline"
-                returncode = 124
+            cycle_trace = private / "interaction-trace" / f"cycle-{cycle:04d}"
+            cycle_trace.mkdir(parents=True, exist_ok=True)
+            os.environ["GF_INTERACTION_TRACE_DIR"] = str(cycle_trace)
+            os.environ["GF_INTERACTION_TRACE_CONSOLE"] = "1"
+            os.environ["GF_INTERACTION_TRACE_DEVICE"] = args.device
+            child_env = os.environ.copy()
+            child_env["PYTHONIOENCODING"] = "utf-8:backslashreplace"
 
-            (private / f"cycle-{cycle:04d}.log").write_text(output, encoding="utf-8", errors="replace")
+            trace_event(
+                "cycle.begin",
+                device=args.device,
+                category="worker",
+                cycle=cycle,
+                trace_directory=str(cycle_trace),
+                consecutive_failures=consecutive_failures,
+            )
+            print(f"Interaction trace: {cycle_trace.relative_to(ROOT)}")
+
+            returncode, output, child_timed_out = _run_child_streamed(
+                _client_command(args),
+                cwd=ROOT,
+                timeout=args.child_timeout,
+                env=child_env,
+                log_path=private / f"cycle-{cycle:04d}.log",
+            )
+            trace_event(
+                "cycle.child-exit",
+                device=args.device,
+                category="worker",
+                cycle=cycle,
+                returncode=returncode,
+                timed_out=child_timed_out,
+            )
             payload = load_shareable(ROOT, output)
             child_status = payload.get("status") if isinstance(payload, dict) else None
             reason = payload.get("reason") if isinstance(payload, dict) else None
             reason = str(reason) if reason else (_last_error(output) or f"child exited {returncode}")
+
+            trace_event(
+                "cycle.result",
+                device=args.device,
+                category="worker",
+                cycle=cycle,
+                returncode=returncode,
+                child_status=child_status,
+                reason=reason,
+            )
 
             if returncode == 0 and child_status == "READY_FOR_PUBLISH":
                 record = {
@@ -186,12 +311,26 @@ def main() -> int:
             print(f"State: {DeviceWorkerState.APP_RECOVERY.value}")
             recovery = None
             recovery_error = None
+            trace_event(
+                "app-recovery.begin",
+                device=args.device,
+                category="worker",
+                cycle=cycle,
+                reason=reason,
+            )
             try:
                 recovery = recover_tiktok_without_reboot(
                     args.device,
                     private / "app-recovery",
                 )
             except Exception as exc:
+                trace_exception(
+                    "app-recovery.error",
+                    exc,
+                    device=args.device,
+                    category="worker",
+                    cycle=cycle,
+                )
                 # The persistent worker itself must survive a failed recovery
                 # attempt. Record it, cool down, and let the next cycle retry
                 # from a fresh health check.
@@ -222,6 +361,19 @@ def main() -> int:
             result["reboot_recommended"] = reboot_recommended
             _write_json(shareable, result)
 
+            trace_event(
+                "app-recovery.end",
+                device=args.device,
+                category="worker",
+                cycle=cycle,
+                success=bool(recovery and recovery.success),
+                recovery_reason=recovery.reason if recovery else recovery_error,
+                process_gone=recovery.process_gone if recovery else False,
+                stable_foreground=recovery.stable_foreground if recovery else False,
+                cooldown_seconds=cooldown,
+                reboot_recommended=reboot_recommended,
+                reboot_attempted=False,
+            )
             if reboot_recommended:
                 print("REBOOT APPROVAL RECOMMENDED: repeated app recovery failures; reboot is disabled")
             print(

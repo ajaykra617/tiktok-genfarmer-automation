@@ -29,6 +29,8 @@ import tempfile
 import time
 from typing import Iterable, Iterator
 
+from .interaction_trace import trace_event, trace_exception, truncate_text
+
 
 class AdbFailureKind(str, Enum):
     BINARY_MISSING = "binary_missing"
@@ -276,33 +278,96 @@ class AdbTransport:
                 return
 
     def _recover_unlocked(self) -> AdbHealth:
+        trace_event(
+            "recovery.begin",
+            device=self.device,
+            category="adb",
+            strategy="start-server_then_per-device-reconnect",
+        )
         self._start_server_unlocked()
         health = self._health_unlocked()
+        trace_event(
+            "recovery.health-after-start-server",
+            device=self.device,
+            category="adb",
+            ready=health.ready,
+            state=health.state,
+            shell_ok=health.shell_ok,
+            detail=health.detail,
+        )
         if health.ready:
+            trace_event(
+                "recovery.complete",
+                device=self.device,
+                category="adb",
+                recovered=True,
+                method="start-server-only",
+            )
             return health
 
         # Network ADB can leave a stale host transport while the phone itself is
         # reachable. Repair only this serial. Never use kill-server here because
         # that would disrupt every device in a 20-phone farm.
         if _TCP_SERIAL_RE.fullmatch(self.device):
+            trace_event(
+                "recovery.device-reconnect.begin",
+                device=self.device,
+                category="adb",
+            )
             try:
-                self._raw(
+                disconnected = self._raw(
                     ["disconnect", self.device],
                     timeout=max(self.health_timeout, 4.0),
                     device_scoped=False,
                 )
-            except (AdbTransportError, _RawTimeout):
-                pass
+                trace_event(
+                    "recovery.device-disconnect.end",
+                    device=self.device,
+                    category="adb",
+                    returncode=disconnected.returncode,
+                    stdout=truncate_text(disconnected.stdout, 300),
+                    stderr=truncate_text(disconnected.stderr, 300),
+                )
+            except (AdbTransportError, _RawTimeout) as exc:
+                trace_exception(
+                    "recovery.device-disconnect.error",
+                    exc,
+                    device=self.device,
+                    category="adb",
+                )
             try:
-                self._raw(
+                connected = self._raw(
                     ["connect", self.device],
                     timeout=max(self.health_timeout, 6.0),
                     device_scoped=False,
                 )
-            except (AdbTransportError, _RawTimeout):
-                pass
+                trace_event(
+                    "recovery.device-connect.end",
+                    device=self.device,
+                    category="adb",
+                    returncode=connected.returncode,
+                    stdout=truncate_text(connected.stdout, 300),
+                    stderr=truncate_text(connected.stderr, 300),
+                )
+            except (AdbTransportError, _RawTimeout) as exc:
+                trace_exception(
+                    "recovery.device-connect.error",
+                    exc,
+                    device=self.device,
+                    category="adb",
+                )
             self.sleeper(0.35)
             health = self._health_unlocked()
+        trace_event(
+            "recovery.complete",
+            device=self.device,
+            category="adb",
+            recovered=health.ready,
+            method="per-device-reconnect" if _TCP_SERIAL_RE.fullmatch(self.device) else "health-only",
+            state=health.state,
+            shell_ok=health.shell_ok,
+            detail=health.detail,
+        )
         return health
 
     def ensure_ready(self) -> AdbHealth:
@@ -337,6 +402,15 @@ class AdbTransport:
         if effective_timeout <= 0:
             raise ValueError("timeout must be positive")
 
+        trace_event(
+            "command.begin",
+            device=self.device,
+            category="adb",
+            args=command_args,
+            mutation=mutation,
+            timeout_seconds=effective_timeout,
+        )
+
         with self._lane():
             attempts = 0
             recovered = False
@@ -351,6 +425,21 @@ class AdbTransport:
                     health = self._health_unlocked()
                     if mutation:
                         status = "healthy" if health.ready else f"unhealthy ({health.state}: {health.detail})"
+                        trace_event(
+                            "command.timeout",
+                            device=self.device,
+                            category="adb",
+                            level="ERROR",
+                            args=command_args,
+                            mutation=True,
+                            elapsed_seconds=round(elapsed, 6),
+                            attempts=attempts,
+                            transport_ready=health.ready,
+                            transport_state=health.state,
+                            shell_ok=health.shell_ok,
+                            transport_detail=health.detail,
+                            mutation_ambiguous=True,
+                        )
                         raise AdbTransportError(
                             f"adb mutation timed out after {effective_timeout:.1f}s; "
                             f"transport remained {status}; mutation outcome is ambiguous",
@@ -364,6 +453,20 @@ class AdbTransport:
                         recovered = True
                         if health.ready:
                             continue
+                    trace_event(
+                        "command.timeout",
+                        device=self.device,
+                        category="adb",
+                        level="ERROR",
+                        args=command_args,
+                        mutation=False,
+                        elapsed_seconds=round(elapsed, 6),
+                        attempts=attempts,
+                        transport_ready=health.ready,
+                        transport_state=health.state,
+                        shell_ok=health.shell_ok,
+                        transport_detail=health.detail,
+                    )
                     raise AdbTransportError(
                         f"adb read-only command timed out after {effective_timeout:.1f}s; "
                         f"transport recovery did not restore a healthy channel",
@@ -372,6 +475,19 @@ class AdbTransport:
                     ) from exc
 
                 if proc.returncode == 0:
+                    trace_event(
+                        "command.end",
+                        device=self.device,
+                        category="adb",
+                        args=command_args,
+                        mutation=mutation,
+                        returncode=0,
+                        elapsed_seconds=round(elapsed, 6),
+                        attempts=attempts,
+                        recovered=recovered,
+                        stdout=truncate_text(proc.stdout, 500),
+                        stderr=truncate_text(proc.stderr, 500),
+                    )
                     return AdbCommandResult(
                         stdout=proc.stdout,
                         stderr=proc.stderr,
@@ -388,6 +504,21 @@ class AdbTransport:
 
                 if mutation:
                     health = self._health_unlocked()
+                    trace_event(
+                        "command.failed",
+                        device=self.device,
+                        category="adb",
+                        level="ERROR",
+                        args=command_args,
+                        mutation=True,
+                        returncode=proc.returncode,
+                        elapsed_seconds=round(elapsed, 6),
+                        attempts=attempts,
+                        detail=detail,
+                        transport_ready=health.ready,
+                        transport_state=health.state,
+                        mutation_ambiguous=True,
+                    )
                     raise AdbTransportError(
                         f"adb mutation failed: {detail}; mutation outcome is ambiguous",
                         kind=kind,
@@ -400,6 +531,19 @@ class AdbTransport:
                     recovered = True
                     if health.ready:
                         continue
+                trace_event(
+                    "command.failed",
+                    device=self.device,
+                    category="adb",
+                    level="ERROR",
+                    args=command_args,
+                    mutation=False,
+                    returncode=proc.returncode,
+                    elapsed_seconds=round(elapsed, 6),
+                    attempts=attempts,
+                    detail=detail,
+                    recovered=recovered,
+                )
                 raise AdbTransportError(
                     detail,
                     kind=kind,

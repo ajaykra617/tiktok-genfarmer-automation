@@ -23,6 +23,7 @@ import re
 from typing import Iterable
 
 from .adb_transport import AdbTransport, AdbTransportError
+from .interaction_trace import trace_event, trace_exception
 from .screen_state import RawScreenFrame, parse_android_raw_screencap
 
 TIKTOK_PACKAGE = "com.zhiliaoapp.musically"
@@ -164,6 +165,12 @@ class AdbObserver:
         self.transport = transport or AdbTransport(device, timeout=timeout)
 
     def _observe(self, *, deep: bool) -> DeviceObservation:
+        trace_event(
+            "observe.begin",
+            device=self.device,
+            category="observer",
+            deep=deep,
+        )
         state = _adb(self.device, ["get-state"], timeout=self.timeout, transport=self.transport)
         if state != "device":
             return DeviceObservation(
@@ -195,7 +202,7 @@ class AdbObserver:
             evidence.append(processes)
 
         interrupt = classify_interrupt(state, package, *evidence)
-        return DeviceObservation(
+        observation = DeviceObservation(
             device=self.device,
             adb_state=state,
             foreground_package=package,
@@ -203,6 +210,18 @@ class AdbObserver:
             tiktok_foreground=package == TIKTOK_PACKAGE,
             interrupt=interrupt,
         )
+        trace_event(
+            "observe.end",
+            device=self.device,
+            category="observer",
+            deep=deep,
+            adb_state=state,
+            foreground_package=package,
+            foreground_activity=component,
+            tiktok_foreground=observation.tiktok_foreground,
+            interrupt=interrupt.value,
+        )
+        return observation
 
     def observe(self) -> DeviceObservation:
         """Fast coarse observation for frequent runtime checks."""

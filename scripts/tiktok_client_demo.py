@@ -38,6 +38,7 @@ from genfarmer_automation.app_resilience import (  # noqa: E402
 from genfarmer_automation.client_demo_plan import build_client_demo_plan  # noqa: E402
 from genfarmer_automation.feed_anchor_qualification import candidates_from_payload  # noqa: E402
 from genfarmer_automation.hierarchy_runtime import capture_hierarchy_batch  # noqa: E402
+from genfarmer_automation.interaction_trace import trace_event, trace_exception  # noqa: E402
 from genfarmer_automation.native_ui import NativeUiError  # noqa: E402
 from genfarmer_automation.passive_feed_recovery import run_passive_feed_advance  # noqa: E402
 from genfarmer_automation.runtime_recovery import RecoveryBudget, RecoveryLimits  # noqa: E402
@@ -120,11 +121,34 @@ def _restore_fyp(supervisor, actions: AdbActions, device: str, candidate, prefer
 
 def _watch(supervisor, seconds: float) -> None:
     remaining = float(seconds)
+    tick = 0
+    trace_event(
+        "watch.begin",
+        device=supervisor.device,
+        category="workflow",
+        requested_seconds=seconds,
+    )
     while remaining > 0:
+        tick += 1
         supervisor.ensure_ready(apply=True)
         chunk = min(1.0, remaining)
+        trace_event(
+            "watch.tick",
+            device=supervisor.device,
+            category="workflow",
+            tick=tick,
+            sleep_seconds=chunk,
+            remaining_before=round(remaining, 3),
+        )
         time.sleep(chunk)
         remaining -= chunk
+    trace_event(
+        "watch.end",
+        device=supervisor.device,
+        category="workflow",
+        requested_seconds=seconds,
+        ticks=tick,
+    )
 
 
 def _warm_scroll(
@@ -145,12 +169,43 @@ def _warm_scroll(
         label = f"warm-scroll-video-{index}"
 
         def operation():
+            trace_event(
+                "warm-scroll.stage.begin",
+                device=device,
+                category="workflow",
+                label=label,
+                video_index=index,
+                total_videos=len(watch_seconds),
+                watch_seconds=seconds,
+            )
             pre_gate, _, restores = _restore_fyp(
                 supervisor, actions, device, candidate, preferred_port
             )
+            trace_event(
+                "warm-scroll.pre-watch-fyp",
+                device=device,
+                category="workflow",
+                label=label,
+                gate_counts=pre_gate.counts,
+                restore_actions=restores,
+            )
             print(f"  [{index}/{len(watch_seconds)}] FYP PASS; watch {seconds:.2f}s")
             _watch(supervisor, seconds)
+            trace_event(
+                "warm-scroll.capture-frame.begin",
+                device=device,
+                category="workflow",
+                label=label,
+            )
             frame = supervisor.run_read_only(observer.capture_raw_frame)
+            trace_event(
+                "warm-scroll.capture-frame.end",
+                device=device,
+                category="workflow",
+                label=label,
+                width=frame.width,
+                height=frame.height,
+            )
 
             def prove_after_checkpoint_reset():
                 supervisor.ensure_ready(apply=True)
@@ -163,6 +218,14 @@ def _warm_scroll(
                 )
                 return post_gate_value
 
+            trace_event(
+                "warm-scroll.swipe.begin",
+                device=device,
+                category="workflow",
+                label=label,
+                width=frame.width,
+                height=frame.height,
+            )
             advance = run_passive_feed_advance(
                 lambda: actions.swipe_up_relative(width=frame.width, height=frame.height),
                 reset_checkpoint=lambda reason: restart_stage(
@@ -171,11 +234,27 @@ def _warm_scroll(
                 prove_checkpoint=prove_after_checkpoint_reset,
             )
 
+            trace_event(
+                "warm-scroll.swipe.result",
+                device=device,
+                category="workflow",
+                label=label,
+                recovered_via_checkpoint=advance.recovered_via_checkpoint,
+                reason=advance.reason,
+            )
+
             if advance.recovered_via_checkpoint:
                 on_nonreplay_recovery(label, advance.reason or "ambiguous feed swipe")
                 print(
                     "      swipe outcome ambiguous; TikTok restarted and qualified FYP "
                     "checkpoint proven without replaying the swipe"
+                )
+                trace_event(
+                    "warm-scroll.stage.end",
+                    device=device,
+                    category="workflow",
+                    label=label,
+                    result="checkpoint-reset-without-swipe-replay",
                 )
                 return {
                     "video": index,
@@ -188,6 +267,15 @@ def _warm_scroll(
             supervisor.ensure_ready(apply=True)
             post_gate, _ = _prove_feed(supervisor, device, candidate, preferred_port)
             print(f"      swipe PASS pre={pre_gate.counts} post={post_gate.counts}")
+            trace_event(
+                "warm-scroll.stage.end",
+                device=device,
+                category="workflow",
+                label=label,
+                result="pass",
+                pre_gate_counts=pre_gate.counts,
+                post_gate_counts=post_gate.counts,
+            )
             return {
                 "video": index,
                 "watch_seconds": seconds,
@@ -212,12 +300,42 @@ def _warm_scroll(
 
 def _resolve_target(supervisor, observer, actions, device, candidate, preferred_port, finder, *, max_feed_advances: int = 2):
     """Find one passive control, advancing only to another qualified feed item."""
+    finder_name = getattr(finder, "__name__", str(finder))
     for attempt in range(max_feed_advances + 1):
+        trace_event(
+            "resolve-target.attempt",
+            device=device,
+            category="workflow",
+            finder=finder_name,
+            attempt=attempt + 1,
+            max_attempts=max_feed_advances + 1,
+        )
         _, batch, _ = _restore_fyp(supervisor, actions, device, candidate, preferred_port)
         xml = batch.snapshots[-1]
         try:
-            return finder(xml, package=TIKTOK_PACKAGE)
-        except NativeUiError:
+            target = finder(xml, package=TIKTOK_PACKAGE)
+            trace_event(
+                "resolve-target.found",
+                device=device,
+                category="workflow",
+                finder=finder_name,
+                center=target.center,
+                bounds=target.bounds,
+                text=target.text,
+                content_desc=target.content_desc,
+                resource_id=target.resource_id,
+                class_name=target.class_name,
+            )
+            return target
+        except NativeUiError as exc:
+            trace_exception(
+                "resolve-target.not-found",
+                exc,
+                device=device,
+                category="workflow",
+                finder=finder_name,
+                attempt=attempt + 1,
+            )
             if attempt >= max_feed_advances:
                 raise
             frame = supervisor.run_read_only(observer.capture_raw_frame)
@@ -227,6 +345,7 @@ def _resolve_target(supervisor, observer, actions, device, candidate, preferred_
 
 
 def _profile_feature(*, supervisor, observer, actions, device, candidate, preferred_port, dwell):
+    trace_event("profile.begin", device=device, category="feature", dwell=dwell)
     target = _resolve_target(
         supervisor, observer, actions, device, candidate, preferred_port, find_creator_profile_entry
     )
@@ -241,10 +360,17 @@ def _profile_feature(*, supervisor, observer, actions, device, candidate, prefer
     actions.keyevent(4)
     time.sleep(1.0)
     _restore_fyp(supervisor, actions, device, candidate, preferred_port)
+    trace_event(
+        "profile.end",
+        device=device,
+        category="feature",
+        proof=list(proof.matched_terms),
+    )
     return {"status": "PASS", "proof": list(proof.matched_terms)}
 
 
 def _comments_feature(*, supervisor, observer, actions, device, candidate, preferred_port, dwell):
+    trace_event("comments.begin", device=device, category="feature", dwell=dwell)
     target = _resolve_target(
         supervisor, observer, actions, device, candidate, preferred_port, find_comments_node
     )
@@ -259,10 +385,24 @@ def _comments_feature(*, supervisor, observer, actions, device, candidate, prefe
     actions.keyevent(4)
     time.sleep(1.0)
     _restore_fyp(supervisor, actions, device, candidate, preferred_port)
+    trace_event(
+        "comments.end",
+        device=device,
+        category="feature",
+        proof=list(proof.matched_terms),
+    )
     return {"status": "PASS", "proof": list(proof.matched_terms)}
 
 
 def _niche_feature(*, kind: str, value: str, device: str, preferred_port: int, private: Path, supervisor, actions, candidate, dwell):
+    trace_event(
+        "niche.begin",
+        device=device,
+        category="feature",
+        kind=kind,
+        value=value,
+        dwell=dwell,
+    )
     cmd = [
         sys.executable,
         str(ROOT / "scripts" / "tiktok_boost_explore.py"),
@@ -286,9 +426,26 @@ def _niche_feature(*, kind: str, value: str, device: str, preferred_port: int, p
     payload = load_shareable(ROOT, output)
     if proc.returncode != 0 or not isinstance(payload, dict) or payload.get("status") != "PASS":
         reason = payload.get("reason") if isinstance(payload, dict) else None
+        trace_event(
+            "niche.child-blocked",
+            device=device,
+            category="feature",
+            level="ERROR",
+            kind=kind,
+            returncode=proc.returncode,
+            payload_status=payload.get("status") if isinstance(payload, dict) else None,
+            reason=reason,
+        )
         raise RuntimeError(f"{kind} exploration failed: {reason or 'child did not reach PASS'}")
     _watch(supervisor, dwell)
     _restore_fyp(supervisor, actions, device, candidate, preferred_port)
+    trace_event(
+        "niche.end",
+        device=device,
+        category="feature",
+        kind=kind,
+        context_verified=payload.get("context_verified"),
+    )
     return {"status": "PASS", "context_verified": payload.get("context_verified")}
 
 
@@ -404,6 +561,19 @@ def main() -> int:
         if not args.media.is_file():
             raise RuntimeError("demo media file does not exist")
 
+        trace_event(
+            "client-demo.begin",
+            device=args.device,
+            category="workflow",
+            seed=args.seed,
+            candidate_index=args.candidate,
+            videos=args.videos,
+            watch_seconds=plan.watch_seconds,
+            feature_order=plan.feature_order,
+            dwell=args.dwell,
+            max_app_restarts=args.max_app_restarts,
+            preferred_hierarchy_port=args.preferred_hierarchy_port,
+        )
         observer = AdbObserver(args.device)
         actions = AdbActions(args.device)
         budget = RecoveryBudget(
@@ -423,9 +593,23 @@ def main() -> int:
         )
 
         def restart_stage(reason: str) -> None:
+            trace_event(
+                "restart-stage.begin",
+                device=args.device,
+                category="recovery",
+                reason=reason,
+                recovery_budget=supervisor.snapshot().recovery_budget_used,
+            )
             print("      RECOVERY: TikTok appears stalled; clean process restart")
             supervisor.hard_restart(reason=reason, settle_seconds=2.0)
             time.sleep(1.0)
+            trace_event(
+                "restart-stage.end",
+                device=args.device,
+                category="recovery",
+                reason=reason,
+                recovery_budget=supervisor.snapshot().recovery_budget_used,
+            )
 
         def on_recovery(event: StageRecoveryEvent) -> None:
             recovery_events.append(
@@ -435,6 +619,14 @@ def main() -> int:
                     "reason": event.reason,
                     "replayed_stage": True,
                 }
+            )
+            trace_event(
+                "checkpoint-replay",
+                device=args.device,
+                category="recovery",
+                label=event.label,
+                restart_number=event.restart_number,
+                reason=event.reason,
             )
             print(f"      RECOVERY COMPLETE: replaying {event.label} from checkpoint")
 
@@ -574,6 +766,14 @@ def main() -> int:
             }
         )
         _write_json(shareable, result)
+        trace_event(
+            "client-demo.end",
+            device=args.device,
+            category="workflow",
+            status="READY_FOR_PUBLISH",
+            runtime_recovery_counts=supervisor.snapshot().recovery_budget_used,
+            app_restart_events=recovery_events,
+        )
 
         restart_count = supervisor.snapshot().recovery_budget_used.get("restart_app", 0)
         print("-" * 78)
@@ -592,6 +792,12 @@ def main() -> int:
         return 0
 
     except (OSError, json.JSONDecodeError, RuntimeError, subprocess.TimeoutExpired, NativeUiError) as exc:
+        trace_exception(
+            "client-demo.error",
+            exc,
+            device=args.device,
+            category="workflow",
+        )
         result["status"] = "BLOCKED"
         result["reason"] = str(exc)
         result["app_restart_events"] = recovery_events

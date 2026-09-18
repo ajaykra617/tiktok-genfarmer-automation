@@ -43,6 +43,25 @@ def _read_fyp_state(supervisor, device: str, candidate, preferred_port: int):
     latest_xml = batch.snapshots[-1]
     proof = classify_fyp_context(latest_xml, package=TIKTOK_PACKAGE)
     live = live_hint_summary(latest_xml, package=TIKTOK_PACKAGE)
+    if live["detected"]:
+        trace_event(
+            "live-hints",
+            device=device,
+            category="live",
+            classified_live_card="live-card" in proof.signals,
+            fyp_state=proof.state.value,
+            fyp_signals=proof.signals,
+            live=live,
+        )
+        if "live-card" not in proof.signals:
+            trace_event(
+                "live-hints-unclassified",
+                device=device,
+                category="live",
+                level="WARNING",
+                message="LIVE-related hierarchy nodes were present but FYP classifier did not label live-card",
+                live=live,
+            )
 
     for index, snapshot in enumerate(batch.snapshots, start=1):
         trace_text_artifact(

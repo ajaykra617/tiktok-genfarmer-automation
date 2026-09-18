@@ -39,6 +39,7 @@ from genfarmer_automation.client_demo_plan import build_client_demo_plan  # noqa
 from genfarmer_automation.feed_anchor_qualification import candidates_from_payload  # noqa: E402
 from genfarmer_automation.hierarchy_runtime import capture_hierarchy_batch  # noqa: E402
 from genfarmer_automation.native_ui import NativeUiError  # noqa: E402
+from genfarmer_automation.passive_feed_recovery import run_passive_feed_advance  # noqa: E402
 from genfarmer_automation.runtime_recovery import RecoveryBudget, RecoveryLimits  # noqa: E402
 from genfarmer_automation.runtime_supervisor import TikTokRuntimeSupervisor  # noqa: E402
 from genfarmer_automation.selector_gate import assess_selector_gate  # noqa: E402
@@ -137,6 +138,7 @@ def _warm_scroll(
     watch_seconds,
     restart_stage,
     on_recovery,
+    on_nonreplay_recovery,
 ):
     rows = []
     for index, seconds in enumerate(watch_seconds, start=1):
@@ -149,12 +151,49 @@ def _warm_scroll(
             print(f"  [{index}/{len(watch_seconds)}] FYP PASS; watch {seconds:.2f}s")
             _watch(supervisor, seconds)
             frame = supervisor.run_read_only(observer.capture_raw_frame)
-            actions.swipe_up_relative(width=frame.width, height=frame.height)
+
+            def prove_after_checkpoint_reset():
+                supervisor.ensure_ready(apply=True)
+                post_gate_value, _, _ = _restore_fyp(
+                    supervisor,
+                    actions,
+                    device,
+                    candidate,
+                    preferred_port,
+                )
+                return post_gate_value
+
+            advance = run_passive_feed_advance(
+                lambda: actions.swipe_up_relative(width=frame.width, height=frame.height),
+                reset_checkpoint=lambda reason: restart_stage(
+                    f"{label}: ambiguous feed swipe on healthy ADB transport: {reason}"
+                ),
+                prove_checkpoint=prove_after_checkpoint_reset,
+            )
+
+            if advance.recovered_via_checkpoint:
+                on_nonreplay_recovery(label, advance.reason or "ambiguous feed swipe")
+                print(
+                    "      swipe outcome ambiguous; TikTok restarted and qualified FYP "
+                    "checkpoint proven without replaying the swipe"
+                )
+                return {
+                    "video": index,
+                    "watch_seconds": seconds,
+                    "restores": restores,
+                    "advance_recovery": "checkpoint_reset_without_swipe_replay",
+                }
+
             time.sleep(1.0)
             supervisor.ensure_ready(apply=True)
             post_gate, _ = _prove_feed(supervisor, device, candidate, preferred_port)
             print(f"      swipe PASS pre={pre_gate.counts} post={post_gate.counts}")
-            return {"video": index, "watch_seconds": seconds, "restores": restores}
+            return {
+                "video": index,
+                "watch_seconds": seconds,
+                "restores": restores,
+                "advance_recovery": None,
+            }
 
         row = run_checkpointed_stage(
             label,
@@ -390,9 +429,23 @@ def main() -> int:
                     "stage": event.label,
                     "restart_number": event.restart_number,
                     "reason": event.reason,
+                    "replayed_stage": True,
                 }
             )
             print(f"      RECOVERY COMPLETE: replaying {event.label} from checkpoint")
+
+        def on_nonreplay_recovery(label: str, reason: str) -> None:
+            recovery_events.append(
+                {
+                    "stage": label,
+                    "restart_number": supervisor.snapshot().recovery_budget_used.get(
+                        "restart_app", 0
+                    ),
+                    "reason": reason,
+                    "replayed_stage": False,
+                    "recovery_mode": "checkpoint_reset_without_mutation_replay",
+                }
+            )
 
         print("=" * 78)
         print("TIKTOK CLIENT DEMO - WARM-UP + BOOST PREPARATION")
@@ -421,6 +474,7 @@ def main() -> int:
             watch_seconds=plan.watch_seconds,
             restart_stage=restart_stage,
             on_recovery=on_recovery,
+            on_nonreplay_recovery=on_nonreplay_recovery,
         )
         feature_results = {}
         for index, feature in enumerate(plan.feature_order, start=1):

@@ -49,6 +49,8 @@ _RESTART_WORTHY_MARKERS = (
 # or ANR that would otherwise be restart-worthy.
 _AMBIGUOUS_MUTATION_MARKERS = (
     "adb action timed out",
+    "adb mutation timed out",
+    "mutation outcome is ambiguous",
     "swipe outcome is ambiguous",
 )
 

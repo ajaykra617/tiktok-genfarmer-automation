@@ -53,9 +53,11 @@ def test_timed_out_swipe_is_reclassified_when_anr_appears(monkeypatch):
 
     monkeypatch.setattr(AdbActions, "swipe_up_relative", base_swipe)
 
-    with pytest.raises(AdbActionError, match="after timed-out swipe; swipe outcome is ambiguous"):
+    with pytest.raises(AdbActionError, match="after timed-out swipe; swipe outcome is ambiguous") as exc:
         actions.swipe_up_relative(width=1080, height=1920)
 
+    assert exc.value.mutation_ambiguous is True
+    assert exc.value.transport_healthy is True
     assert observed_timeouts == [6.0]
     assert actions.timeout == 12.0
     assert observer.calls == 2

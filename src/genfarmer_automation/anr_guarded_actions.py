@@ -55,7 +55,10 @@ class AnrGuardedAdbActions(AdbActions):
                     "TikTok app-not-responding before swipe; swipe was not sent"
                 )
             raise AdbActionError(
-                "TikTok app-not-responding after timed-out swipe; swipe outcome is ambiguous"
+                "TikTok app-not-responding after timed-out swipe; swipe outcome is ambiguous",
+                mutation_ambiguous=True,
+                transport_healthy=True,
+                failure_kind="timeout",
             )
 
     def swipe_up_relative(

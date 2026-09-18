@@ -15,6 +15,9 @@ def test_runtime_and_hierarchy_faults_are_restart_worthy():
 def test_timed_out_ui_mutations_are_not_restart_worthy():
     assert not restart_worthy_failure("adb action timed out after 12.0s")
     assert not restart_worthy_failure(
+        "adb mutation timed out after 6.0s; transport remained healthy; mutation outcome is ambiguous"
+    )
+    assert not restart_worthy_failure(
         "TikTok app-not-responding after timed-out swipe; swipe outcome is ambiguous"
     )
 

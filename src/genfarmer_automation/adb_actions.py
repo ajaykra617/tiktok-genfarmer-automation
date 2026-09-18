@@ -16,7 +16,20 @@ from .adb_transport import AdbTransport, AdbTransportError
 
 
 class AdbActionError(RuntimeError):
-    pass
+    """ADB mutation failure with transport/outcome metadata when available."""
+
+    def __init__(
+        self,
+        message: str,
+        *,
+        mutation_ambiguous: bool = False,
+        transport_healthy: bool | None = None,
+        failure_kind: str | None = None,
+    ) -> None:
+        super().__init__(message)
+        self.mutation_ambiguous = mutation_ambiguous
+        self.transport_healthy = transport_healthy
+        self.failure_kind = failure_kind
 
 
 @dataclass(frozen=True)
@@ -45,7 +58,12 @@ class AdbActions:
         try:
             result = self.transport.run(args, timeout=self.timeout, mutation=True)
         except AdbTransportError as exc:
-            raise AdbActionError(str(exc)) from exc
+            raise AdbActionError(
+                str(exc),
+                mutation_ambiguous=exc.mutation_ambiguous,
+                transport_healthy=exc.transport_healthy,
+                failure_kind=exc.kind.value,
+            ) from exc
         return result.stdout_text()
 
     def launch_component(self, component: str) -> AdbActionResult:

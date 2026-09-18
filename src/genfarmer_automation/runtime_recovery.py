@@ -100,7 +100,10 @@ _HIERARCHY_MARKERS = (
 
 _ADB_TRANSIENT_MARKERS = (
     "adb command timed out",
+    "adb read-only command timed out",
     "adb action timed out",
+    "adb device transport is not ready",
+    "transport recovery did not restore a healthy channel",
     "device offline",
     "device unauthorized",
     "no devices/emulators found",

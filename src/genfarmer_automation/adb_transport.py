@@ -359,7 +359,7 @@ class AdbTransport:
                             transport_healthy=health.ready,
                         ) from exc
 
-                    if attempts <= self.read_retries + 1:
+                    if attempts <= self.read_retries:
                         health = self._recover_unlocked()
                         recovered = True
                         if health.ready:
@@ -395,7 +395,7 @@ class AdbTransport:
                         transport_healthy=health.ready,
                     )
 
-                if attempts <= self.read_retries + 1:
+                if attempts <= self.read_retries:
                     health = self._recover_unlocked()
                     recovered = True
                     if health.ready:

@@ -40,6 +40,8 @@ _RESTART_WORTHY_MARKERS = (
     "foreground recovery failed",
     "app-not-responding",
     "boost explore did not reach pass",
+    "tiktok fyp remained in loading state after bounded settle",
+    "tiktok fyp remained loading after bounded settle",
 )
 
 # A timed-out read-only ADB command can be retried/recovered safely, but a timed-

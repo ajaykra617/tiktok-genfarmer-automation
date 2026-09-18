@@ -26,6 +26,15 @@ def test_anr_before_unsent_swipe_remains_restart_worthy():
     assert restart_worthy_failure("TikTok app-not-responding before swipe; swipe was not sent")
 
 
+def test_persistent_fyp_loading_is_restart_worthy_at_checkpoint():
+    assert restart_worthy_failure(
+        "TikTok FYP remained in loading state after bounded settle; counts=(0, 0)"
+    )
+    assert restart_worthy_failure(
+        "TikTok FYP remained loading after bounded settle; last counts=(0, 0)"
+    )
+
+
 def test_unknown_semantic_failure_is_not_restart_worthy():
     assert not restart_worthy_failure("expected unique Search control but found 2")
 

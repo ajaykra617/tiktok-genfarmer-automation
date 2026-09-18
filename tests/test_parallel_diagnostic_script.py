@@ -47,3 +47,29 @@ def test_parallel_launcher_worker_command_remains_pre_publish_and_non_reboot():
     assert "tiktok_persistent_device_worker.py" in cmd[1]
     assert "--publish" not in cmd
     assert "reboot" not in joined
+
+
+def test_parallel_launcher_propagates_ai_advisor_flags():
+    module = load_script()
+    args = SimpleNamespace(
+        candidates=Path("candidates.json"),
+        candidate=8,
+        proxy_id="proxy-1",
+        media=Path("media.mp4"),
+        keyword="technology",
+        hashtag="technology",
+        videos=3,
+        watch_min=4.0,
+        watch_max=7.0,
+        dwell=3.0,
+        seed=43,
+        max_app_restarts=3,
+        max_cycles=2,
+        preferred_hierarchy_port=8912,
+        ai_advisor=True,
+        ai_timeout=17.0,
+    )
+    cmd = module._worker_command(args, "device:5555")
+    assert "--ai-advisor" in cmd
+    assert "--ai-timeout" in cmd
+    assert cmd[cmd.index("--ai-timeout") + 1] == "17.0"

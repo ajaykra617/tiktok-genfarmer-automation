@@ -20,6 +20,11 @@ import sys
 import threading
 
 ROOT = Path(__file__).resolve().parents[1]
+SRC = ROOT / "src"
+if str(SRC) not in sys.path:
+    sys.path.insert(0, str(SRC))
+
+from genfarmer_automation.interaction_trace import console_safe_text  # noqa: E402
 
 
 def _parse_device(raw: str) -> tuple[str, str]:
@@ -104,6 +109,8 @@ def main() -> int:
         for name, serial in args.device:
             log = (out / f"{name}.log").open("w", encoding="utf-8", errors="replace")
             logs[name] = log
+            env = dict(**__import__("os").environ)
+            env["PYTHONIOENCODING"] = "utf-8:backslashreplace"
             proc = subprocess.Popen(
                 _worker_command(args, serial),
                 cwd=ROOT,
@@ -111,12 +118,15 @@ def main() -> int:
                 stdout=subprocess.PIPE,
                 stderr=subprocess.STDOUT,
                 bufsize=1,
+                env=env,
+                encoding="utf-8",
+                errors="backslashreplace",
             )
             procs[name] = proc
             thread = threading.Thread(target=reader, args=(name, proc), daemon=True, name=f"reader-{name}")
             thread.start()
             readers.append(thread)
-            print(f"[{name}] START serial={serial} pid={proc.pid}", flush=True)
+            print(console_safe_text(f"[{name}] START serial={serial} pid={proc.pid}"), flush=True)
 
         finished: set[str] = set()
         while len(finished) < len(procs):
@@ -124,7 +134,7 @@ def main() -> int:
             if line is None:
                 finished.add(name)
                 continue
-            print(f"[{name}] {line}", end="", flush=True)
+            print(console_safe_text(f"[{name}] {line}"), end="", flush=True)
             log = logs[name]
             log.write(line)
             log.flush()

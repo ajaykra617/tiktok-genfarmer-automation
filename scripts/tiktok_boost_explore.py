@@ -41,6 +41,7 @@ from genfarmer_automation.runtime_supervisor import (  # noqa: E402
     TikTokRuntimeSupervisor,
 )
 from genfarmer_automation.search_entry import wait_for_search_editable  # noqa: E402
+from genfarmer_automation import tiktok_semantics as semantics  # noqa: E402
 
 TIKTOK_PACKAGE = "com.zhiliaoapp.musically"
 
@@ -191,7 +192,7 @@ def main() -> int:
                 lambda: _capture(args.device, args.preferred_hierarchy_port)
             )
             (private / "feed-before-search.xml").write_text(xml, encoding="utf-8")
-            search = find_semantic_node(xml, ("Search",), package=TIKTOK_PACKAGE)
+            search = find_semantic_node(xml, semantics.SEARCH, package=TIKTOK_PACKAGE)
             actions.tap(*search.center)
             time.sleep(1.5)
             supervisor.ensure_ready(apply=True)
@@ -231,7 +232,7 @@ def main() -> int:
             tab_selected = False
             if args.type == "hashtag":
                 try:
-                    tab = find_exact_semantic_node(xml, ("Hashtags", "Hashtag"), package=TIKTOK_PACKAGE)
+                    tab = find_exact_semantic_node(xml, semantics.HASHTAG_TABS, package=TIKTOK_PACKAGE)
                     actions.tap(*tab.center)
                     tab_selected = True
                     time.sleep(1.5)
@@ -243,7 +244,7 @@ def main() -> int:
                     pass
             elif args.type == "account":
                 try:
-                    tab = find_exact_semantic_node(xml, ("Users", "Accounts", "User"), package=TIKTOK_PACKAGE)
+                    tab = find_exact_semantic_node(xml, semantics.ACCOUNT_TABS, package=TIKTOK_PACKAGE)
                     actions.tap(*tab.center)
                     tab_selected = True
                     time.sleep(1.5)

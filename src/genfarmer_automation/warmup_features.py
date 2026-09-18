@@ -21,6 +21,7 @@ from .native_ui import (
     find_exact_semantic_node,
     find_semantic_node,
 )
+from . import tiktok_semantics as semantics
 
 
 class WarmupFeature(str, Enum):
@@ -49,9 +50,9 @@ def _contains_any(value: str, terms: Iterable[str]) -> bool:
 def find_feed_source_node(xml: str, source: str, *, package: str | None = None) -> UiNode:
     normalized = source.strip().casefold().replace("_", "-")
     if normalized in {"foryou", "for-you", "for you", "fyp"}:
-        terms = ("For You", "For you", "Pour toi")
+        terms = semantics.FOR_YOU
     elif normalized in {"following", "follow"}:
-        terms = ("Following", "Abonnements")
+        terms = semantics.FOLLOWING
     else:
         raise ValueError(f"unsupported feed source: {source}")
     return find_exact_semantic_node(xml, terms, package=package)
@@ -67,16 +68,12 @@ def following_empty_state(xml: str, *, package: str | None = None) -> ContextPro
     matched: list[str] = []
     for node in collect_nodes(xml, package=package):
         joined = f"{node.text} {node.content_desc}"
-        if _contains_any(joined, ("Trending creators", "Créateurs tendance")):
+        if _contains_any(joined, semantics.FOLLOWING_TRENDING_CREATORS):
             if "trending-creators" not in matched:
                 matched.append("trending-creators")
         if _contains_any(
             joined,
-            (
-                "Follow an account to see their latest videos here",
-                "Follow an account to see their latest videos here.",
-                "Suivez un compte",
-            ),
+            semantics.FOLLOWING_PREREQUISITE,
         ):
             if "follow-prerequisite" not in matched:
                 matched.append("follow-prerequisite")
@@ -90,7 +87,7 @@ def find_comments_node(xml: str, *, package: str | None = None) -> UiNode:
         if not node.enabled or not node.clickable:
             continue
         haystack = f"{node.text} {node.content_desc} {node.resource_id.rsplit('/', 1)[-1]}"
-        if _contains_any(haystack, ("comments", "comment", "commentaires")):
+        if _contains_any(haystack, semantics.COMMENTS):
             candidates.append(node)
     if not candidates:
         raise NativeUiNotFound("no clickable comments control found in current hierarchy")
@@ -100,23 +97,23 @@ def find_comments_node(xml: str, *, package: str | None = None) -> UiNode:
     ranked = sorted(
         candidates,
         key=lambda node: (
-            int(_contains_any(node.content_desc, ("comments", "comment", "commentaires"))),
-            int(_contains_any(node.text, ("comments", "comment", "commentaires"))),
+            int(_contains_any(node.content_desc, semantics.COMMENTS)),
+            int(_contains_any(node.text, semantics.COMMENTS)),
             -node.area,
         ),
         reverse=True,
     )
     top = ranked[0]
     top_key = (
-        int(_contains_any(top.content_desc, ("comments", "comment", "commentaires"))),
-        int(_contains_any(top.text, ("comments", "comment", "commentaires"))),
+        int(_contains_any(top.content_desc, semantics.COMMENTS)),
+        int(_contains_any(top.text, semantics.COMMENTS)),
         -top.area,
     )
     tied = [
         node for node in ranked
         if (
-            int(_contains_any(node.content_desc, ("comments", "comment", "commentaires"))),
-            int(_contains_any(node.text, ("comments", "comment", "commentaires"))),
+            int(_contains_any(node.content_desc, semantics.COMMENTS)),
+            int(_contains_any(node.text, semantics.COMMENTS)),
             -node.area,
         ) == top_key
     ]
@@ -165,8 +162,8 @@ def find_creator_profile_entry(xml: str, *, package: str | None = None) -> UiNod
 def prove_comments_context(xml: str, *, package: str | None = None) -> ContextProof:
     matched: list[str] = []
     checks = (
-        ("comments", ("Comments", "Comment", "Commentaires")),
-        ("add-comment", ("Add comment", "Add comment...", "Ajouter un commentaire")),
+        ("comments", semantics.COMMENTS),
+        ("add-comment", semantics.ADD_COMMENT),
     )
     for label, terms in checks:
         try:
@@ -180,10 +177,10 @@ def prove_comments_context(xml: str, *, package: str | None = None) -> ContextPr
 def prove_profile_context(xml: str, *, package: str | None = None) -> ContextProof:
     matched: list[str] = []
     checks = (
-        ("followers", ("Followers", "Abonnés")),
-        ("following", ("Following", "Abonnements")),
-        ("likes", ("Likes", "J'aime")),
-        ("videos", ("Videos", "Vidéos")),
+        ("followers", semantics.PROFILE_FOLLOWERS),
+        ("following", semantics.PROFILE_FOLLOWING),
+        ("likes", semantics.PROFILE_LIKES),
+        ("videos", semantics.PROFILE_VIDEOS),
     )
     for label, terms in checks:
         try:

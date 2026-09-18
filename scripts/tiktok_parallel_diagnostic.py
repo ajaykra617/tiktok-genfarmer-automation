@@ -13,6 +13,7 @@ from __future__ import annotations
 import argparse
 from datetime import datetime, timezone
 from pathlib import Path
+import os
 import queue
 import re
 import subprocess
@@ -109,7 +110,7 @@ def main() -> int:
         for name, serial in args.device:
             log = (out / f"{name}.log").open("w", encoding="utf-8", errors="replace")
             logs[name] = log
-            env = dict(**__import__("os").environ)
+            env = os.environ.copy()
             env["PYTHONIOENCODING"] = "utf-8:backslashreplace"
             proc = subprocess.Popen(
                 _worker_command(args, serial),

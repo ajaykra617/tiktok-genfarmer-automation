@@ -15,6 +15,7 @@ class DeviceWorkerState(str, Enum):
     RUNNING = "running"
     APP_RECOVERY = "app_recovery"
     COOLDOWN = "cooldown"
+    WAITING_RESOURCE = "waiting_resource"
     REBOOT_APPROVAL_RECOMMENDED = "reboot_approval_recommended"
     COMPLETE = "complete"
 

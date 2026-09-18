@@ -27,6 +27,7 @@ if str(SRC) not in sys.path:
 
 from genfarmer_automation.ai_advisor import (  # noqa: E402
     AdvisorConfigurationError,
+    FailureDomain,
     ModConRecoveryAdvisor,
     RecoveryDecisionContext,
     RecoveryPlanAction,
@@ -346,6 +347,44 @@ def main() -> int:
             print(f"Decision rationale: {plan.rationale}")
             if plan.advisor_error:
                 print(f"AI advisor fallback: {plan.advisor_error}")
+
+            if plan.failure_domain is FailureDomain.MEDIA_RESOURCE:
+                record = {
+                    "cycle": cycle,
+                    "state": DeviceWorkerState.WAITING_RESOURCE.value,
+                    "client_status": child_status,
+                    "reason": reason,
+                    "recovery_used": False,
+                    "recovery_plan": plan.to_dict(),
+                    "reboot_recommended": False,
+                    "reboot_attempted": False,
+                }
+                result["cycles"].append(record)
+                result.update({
+                    "status": "WAITING_RESOURCE",
+                    "last_state": DeviceWorkerState.WAITING_RESOURCE.value,
+                    "reason": reason,
+                    "reboot_recommended": False,
+                })
+                _write_json(shareable, result)
+                trace_event(
+                    "resource-wait",
+                    device=args.device,
+                    category="worker",
+                    cycle=cycle,
+                    reason=reason,
+                    recovery_plan=plan.to_dict(),
+                )
+                print(
+                    "State: waiting_resource "
+                    "(shared approved-media availability; app recovery not applicable)"
+                )
+                print(
+                    "Worker result: WAITING_RESOURCE; stopping this bounded device run "
+                    "without replaying warm-up"
+                )
+                print(f"Shareable result: {shareable.relative_to(ROOT)}")
+                return 3
 
             if plan.action is RecoveryPlanAction.STOP_NONRETRYABLE:
                 result["cycles"].append({

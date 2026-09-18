@@ -68,6 +68,14 @@ def _worker_command(args, serial: str) -> list[str]:
     )
 
 
+def _worker_exit_status(returncode: int) -> str:
+    if returncode == 0:
+        return "READY_FOR_PUBLISH"
+    if returncode == 3:
+        return "WAITING_RESOURCE"
+    return "FAILED"
+
+
 def main() -> int:
     ap = argparse.ArgumentParser(description="Parallel multi-device TikTok diagnostic runner")
     ap.add_argument("candidates", type=Path)
@@ -181,13 +189,10 @@ def main() -> int:
     print("=" * 78)
     for name, serial in args.device:
         returncode = procs[name].wait()
-        if returncode == 0:
-            status = "READY_FOR_PUBLISH"
-        elif returncode == 3:
-            status = "WAITING_RESOURCE"
+        status = _worker_exit_status(returncode)
+        if status == "WAITING_RESOURCE":
             resource_waits += 1
-        else:
-            status = "FAILED"
+        elif status == "FAILED":
             failures += 1
         print(f"{name}: serial={serial} status={status} exit={returncode}")
     print(f"Combined logs: {out.relative_to(ROOT)}")

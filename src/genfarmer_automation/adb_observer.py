@@ -190,6 +190,7 @@ class AdbObserver:
                 self.device,
                 ["shell", "dumpsys", "activity", "processes", TIKTOK_PACKAGE],
                 timeout=self.timeout,
+                transport=self.transport,
             )
             evidence.append(processes)
 

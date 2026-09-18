@@ -25,6 +25,14 @@ SRC = ROOT / "src"
 if str(SRC) not in sys.path:
     sys.path.insert(0, str(SRC))
 
+from genfarmer_automation.ai_advisor import (  # noqa: E402
+    AdvisorConfigurationError,
+    ModConRecoveryAdvisor,
+    RecoveryDecisionContext,
+    RecoveryPlanAction,
+    build_recovery_plan,
+    summarize_trace_directory,
+)
 from genfarmer_automation.device_app_recovery import recover_tiktok_without_reboot  # noqa: E402
 from genfarmer_automation.device_self_healing import (  # noqa: E402
     DeviceWorkerState,
@@ -185,6 +193,17 @@ def main() -> int:
     ap.add_argument("--max-cycles", type=int, default=6, help="bounded attempts when --persistent is absent")
     ap.add_argument("--persistent", action="store_true", help="keep retrying with capped cooldown until success/Ctrl+C")
     ap.add_argument("--child-timeout", type=float, default=1200.0)
+    ap.add_argument(
+        "--ai-advisor",
+        action="store_true",
+        help="use constrained ModCon advice for blocked-cycle recovery decisions",
+    )
+    ap.add_argument(
+        "--ai-timeout",
+        type=float,
+        default=20.0,
+        help="ModCon request deadline in seconds when --ai-advisor is enabled",
+    )
     args = ap.parse_args()
 
     if not 1 <= args.max_cycles <= 100:
@@ -199,6 +218,12 @@ def main() -> int:
     private.mkdir(parents=True, exist_ok=True)
     shareable = out / "persistent-device-worker.shareable.json"
     policy = SelfHealingPolicy()
+    advisor = None
+    if args.ai_advisor:
+        try:
+            advisor = ModConRecoveryAdvisor(timeout_seconds=args.ai_timeout)
+        except AdvisorConfigurationError as exc:
+            ap.error(str(exc))
 
     result = {
         "timestamp_utc": datetime.now(timezone.utc).isoformat(),
@@ -210,6 +235,8 @@ def main() -> int:
         "publishing_ui_entered": False,
         "final_post_action": False,
         "engagement_actions": 0,
+        "ai_advisor_enabled": bool(args.ai_advisor),
+        "ai_model": advisor.model if advisor is not None else None,
         "cycles": [],
     }
 
@@ -293,6 +320,49 @@ def main() -> int:
                 return 0
 
             consecutive_failures += 1
+            trace_summary = summarize_trace_directory(cycle_trace)
+            decision_context = RecoveryDecisionContext(
+                device=args.device,
+                reason=reason,
+                child_status=child_status,
+                returncode=returncode,
+                consecutive_failures=consecutive_failures,
+                trace_summary=trace_summary,
+            )
+            plan = build_recovery_plan(decision_context, advisor=advisor)
+            trace_event(
+                "recovery-plan",
+                device=args.device,
+                category="advisor",
+                cycle=cycle,
+                **plan.to_dict(),
+            )
+            print(
+                "Decision brain: "
+                f"domain={plan.failure_domain.value} "
+                f"action={plan.action.value} "
+                f"source={plan.source}"
+            )
+            print(f"Decision rationale: {plan.rationale}")
+            if plan.advisor_error:
+                print(f"AI advisor fallback: {plan.advisor_error}")
+
+            if plan.action is RecoveryPlanAction.STOP_NONRETRYABLE:
+                result["cycles"].append({
+                    "cycle": cycle,
+                    "state": "blocked_configuration",
+                    "client_status": child_status,
+                    "reason": reason,
+                    "recovery_used": False,
+                    "recovery_plan": plan.to_dict(),
+                })
+                result.update({"status": "BLOCKED_NONRETRYABLE", "reason": reason})
+                _write_json(shareable, result)
+                print(f"ERROR: non-retryable client failure: {reason}", file=sys.stderr)
+                return 2
+
+            # Preserve the older configuration backstop even if a new reason has
+            # not yet been added to the richer classifier.
             if not retryable_client_failure(reason):
                 result["cycles"].append({
                     "cycle": cycle,
@@ -300,42 +370,65 @@ def main() -> int:
                     "client_status": child_status,
                     "reason": reason,
                     "recovery_used": False,
+                    "recovery_plan": plan.to_dict(),
                 })
                 result.update({"status": "BLOCKED_NONRETRYABLE", "reason": reason})
                 _write_json(shareable, result)
                 print(f"ERROR: non-retryable client failure: {reason}", file=sys.stderr)
                 return 2
 
-            reboot_recommended = policy.reboot_approval_recommended(consecutive_failures)
+            reboot_recommended = (
+                policy.reboot_approval_recommended(consecutive_failures)
+                or plan.reboot_recommended
+            )
+            cooldown = policy.cooldown_for_failure(consecutive_failures)
             print(f"Client cycle blocked: {reason}")
-            print(f"State: {DeviceWorkerState.APP_RECOVERY.value}")
+
             recovery = None
             recovery_error = None
-            trace_event(
-                "app-recovery.begin",
-                device=args.device,
-                category="worker",
-                cycle=cycle,
-                reason=reason,
-            )
-            try:
-                recovery = recover_tiktok_without_reboot(
-                    args.device,
-                    private / "app-recovery",
-                )
-            except Exception as exc:
-                trace_exception(
-                    "app-recovery.error",
-                    exc,
+            recovery_used = plan.action is RecoveryPlanAction.APP_RECOVERY
+
+            if recovery_used:
+                print(f"State: {DeviceWorkerState.APP_RECOVERY.value}")
+                trace_event(
+                    "app-recovery.begin",
                     device=args.device,
                     category="worker",
                     cycle=cycle,
+                    reason=reason,
+                    recovery_plan=plan.to_dict(),
                 )
-                # The persistent worker itself must survive a failed recovery
-                # attempt. Record it, cool down, and let the next cycle retry
-                # from a fresh health check.
-                recovery_error = str(exc) or exc.__class__.__name__
-            cooldown = policy.cooldown_for_failure(consecutive_failures)
+                try:
+                    recovery = recover_tiktok_without_reboot(
+                        args.device,
+                        private / "app-recovery",
+                    )
+                except Exception as exc:
+                    trace_exception(
+                        "app-recovery.error",
+                        exc,
+                        device=args.device,
+                        category="worker",
+                        cycle=cycle,
+                    )
+                    # The persistent worker itself must survive a failed recovery
+                    # attempt. Record it, cool down, and let the next cycle retry
+                    # from a fresh health check.
+                    recovery_error = str(exc) or exc.__class__.__name__
+            else:
+                print(
+                    "State: cooldown "
+                    f"(app recovery skipped by {plan.source} decision)"
+                )
+                trace_event(
+                    "app-recovery.skipped",
+                    device=args.device,
+                    category="worker",
+                    cycle=cycle,
+                    reason=reason,
+                    recovery_plan=plan.to_dict(),
+                )
+
             state = (
                 DeviceWorkerState.REBOOT_APPROVAL_RECOMMENDED
                 if reboot_recommended
@@ -346,7 +439,8 @@ def main() -> int:
                 "state": state.value,
                 "client_status": child_status,
                 "reason": reason,
-                "recovery_used": True,
+                "recovery_used": recovery_used,
+                "recovery_plan": plan.to_dict(),
                 "app_recovery_success": bool(recovery and recovery.success),
                 "force_stop_attempts": recovery.force_stop_attempts if recovery else 0,
                 "process_gone": recovery.process_gone if recovery else False,
@@ -361,25 +455,32 @@ def main() -> int:
             result["reboot_recommended"] = reboot_recommended
             _write_json(shareable, result)
 
-            trace_event(
-                "app-recovery.end",
-                device=args.device,
-                category="worker",
-                cycle=cycle,
-                success=bool(recovery and recovery.success),
-                recovery_reason=recovery.reason if recovery else recovery_error,
-                process_gone=recovery.process_gone if recovery else False,
-                stable_foreground=recovery.stable_foreground if recovery else False,
-                cooldown_seconds=cooldown,
-                reboot_recommended=reboot_recommended,
-                reboot_attempted=False,
-            )
+            if recovery_used:
+                trace_event(
+                    "app-recovery.end",
+                    device=args.device,
+                    category="worker",
+                    cycle=cycle,
+                    success=bool(recovery and recovery.success),
+                    recovery_reason=recovery.reason if recovery else recovery_error,
+                    process_gone=recovery.process_gone if recovery else False,
+                    stable_foreground=recovery.stable_foreground if recovery else False,
+                    cooldown_seconds=cooldown,
+                    reboot_recommended=reboot_recommended,
+                    reboot_attempted=False,
+                )
+                print(
+                    f"App recovery: {'PASS' if recovery and recovery.success else 'FAILED'}; "
+                    f"cooldown={cooldown:.1f}s; reboot=NOT ATTEMPTED"
+                )
+            else:
+                print(
+                    f"App recovery: SKIPPED; cooldown={cooldown:.1f}s; "
+                    "reboot=NOT ATTEMPTED"
+                )
+
             if reboot_recommended:
-                print("REBOOT APPROVAL RECOMMENDED: repeated app recovery failures; reboot is disabled")
-            print(
-                f"App recovery: {'PASS' if recovery and recovery.success else 'FAILED'}; "
-                f"cooldown={cooldown:.1f}s; reboot=NOT ATTEMPTED"
-            )
+                print("REBOOT APPROVAL RECOMMENDED: reboot remains disabled")
 
             if not args.persistent and cycle >= args.max_cycles:
                 break

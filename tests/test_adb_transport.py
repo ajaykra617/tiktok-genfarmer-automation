@@ -30,6 +30,11 @@ def test_read_only_timeout_recovers_then_retries(tmp_path, monkeypatch):
         return AdbHealth(True, "device", True, "healthy")
 
     monkeypatch.setattr(transport, "_raw", raw)
+    monkeypatch.setattr(
+        transport,
+        "_health_unlocked",
+        lambda: AdbHealth(False, "offline", False, "device offline"),
+    )
     monkeypatch.setattr(transport, "_recover_unlocked", recover)
 
     result = transport.run(["shell", "echo", "ok"], timeout=1.0, mutation=False)

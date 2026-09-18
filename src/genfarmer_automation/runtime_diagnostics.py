@@ -116,6 +116,8 @@ def capture_tiktok_runtime_diagnostics(
         "activity": ("shell", "dumpsys", "activity", "activities"),
         "processes": ("shell", "dumpsys", "activity", "processes", TIKTOK_PACKAGE),
         "meminfo": ("shell", "dumpsys", "meminfo", TIKTOK_PACKAGE),
+        "lastanr": ("shell", "dumpsys", "activity", "lastanr"),
+        "events": ("logcat", "-b", "events", "-d", "-t", "350"),
         "logcat": ("logcat", "-d", "-t", "350"),
     }
 

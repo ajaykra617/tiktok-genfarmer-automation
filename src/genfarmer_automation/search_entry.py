@@ -12,6 +12,7 @@ import time
 from typing import Callable
 
 from .native_ui import NativeUiNotFound, UiNode, find_editable_node
+from .tiktok_semantics import SEARCH
 
 
 @dataclass(frozen=True)
@@ -49,7 +50,7 @@ def wait_for_search_editable(
             node = find_editable_node(
                 last_xml,
                 package=package,
-                hints=("Search", "Rechercher"),
+                hints=SEARCH,
             )
         except NativeUiNotFound:
             if index >= attempts:
